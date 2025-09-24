@@ -1,0 +1,229 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FrontWave - Viewer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/libs/leaflet.css" />
+  <style>
+    body { margin:0; font-family:sans-serif }
+    header { background:#333; color:#fff; padding:1rem }
+    section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
+    .chips { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0 }
+    .chip { background:#eee; padding:0.5rem 1rem; border-radius:20px; display:flex; flex-direction:column; align-items:center }
+    .chip strong { font-size:1.2em }
+    .muted { color:#555; font-size:0.9em }
+    .table-wrap { overflow-x:auto }
+    table.compact { border-collapse:collapse; width:100% }
+    table.compact th, table.compact td { border:1px solid #ccc; padding:4px 6px; font-size:0.9em }
+    table.compact th { background:#f5f5f5; text-align:left }
+    .actions { margin-top:0.5rem; display:flex; gap:0.5rem }
+    #map { height:400px; margin:1rem }
+  </style>
+  <script src="/static/libs/leaflet.js"></script>
+</head>
+<body>
+  <header>
+    <h1>FrontWave Tool</h1>
+    <h3>Velocity surfaces and statistics</h3>
+    <p class="muted">Upload CSV → Process → Visualize results</p>
+  </header>
+
+  <!-- Step 1 · Upload -->
+  <section class="card">
+    <h2>Step 1 · Upload CSV</h2>
+    <input type="file" id="csvfile" accept=".csv" />
+    <button id="process">Process</button>
+  </section>
+
+  <!-- Step 2 · Map -->
+  <section class="card">
+    <h2>Step 2 · Map</h2>
+    <div id="map"></div>
+  </section>
+
+  <!-- Step 3 · Downloads -->
+  <section class="card">
+    <h2>Step 3 · Downloads</h2>
+    <ul id="downloads"></ul>
+  </section>
+
+  <!-- Step 4 · Other stats -->
+  <section class="card">
+    <h2>Step 4 · Other statistics</h2>
+    <pre id="other-stats">—</pre>
+  </section>
+
+  <!-- Step 5 · Velocity summary -->
+  <section id="step5" class="card" style="display:none">
+    <h2>Step 5 · Velocity summary</h2>
+    <p class="muted">Statistics computed on the full raster (valid cells only).</p>
+
+    <div id="vel-chips" class="chips">
+      <div class="chip"><span>Mean</span><strong id="vel-mean">—</strong></div>
+      <div class="chip"><span>Min</span><strong id="vel-min">—</strong></div>
+      <div class="chip"><span>Max</span><strong id="vel-max">—</strong></div>
+      <div class="chip"><span>Std. dev.</span><strong id="vel-std">—</strong></div>
+      <div class="chip"><span>95% CI (mean)</span><strong id="vel-ci">—</strong></div>
+      <div class="chip"><span>N valid</span><strong id="vel-n">—</strong></div>
+    </div>
+
+    <details id="vel-details">
+      <summary>Details</summary>
+      <div class="table-wrap">
+        <table class="compact">
+          <tbody>
+            <tr><th>Count (valid)</th><td id="vel-count">—</td></tr>
+            <tr><th>NoData count</th><td id="vel-nodata">—</td></tr>
+            <tr><th>NoData %</th><td id="vel-nodata-pct">—</td></tr>
+            <tr><th>Mean</th><td id="vel-mean2">—</td></tr>
+            <tr><th>Std. dev.</th><td id="vel-std2">—</td></tr>
+            <tr><th>Std. error</th><td id="vel-se">—</td></tr>
+            <tr><th>p05</th><td id="vel-p05">—</td></tr>
+            <tr><th>p25</th><td id="vel-p25">—</td></tr>
+            <tr><th>p50</th><td id="vel-p50">—</td></tr>
+            <tr><th>p75</th><td id="vel-p75">—</td></tr>
+            <tr><th>p95</th><td id="vel-p95">—</td></tr>
+            <tr><th>Range</th><td id="vel-range">—</td></tr>
+            <tr><th>Coef. of variation (%)</th><td id="vel-cv">—</td></tr>
+            <tr><th>CI95% lower</th><td id="vel-ci-low">—</td></tr>
+            <tr><th>CI95% upper</th><td id="vel-ci-high">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Units: [m/s]. 95% CI assumes independent cells (naive).</p>
+      <div class="actions">
+        <button id="vel-export">Export stats CSV</button>
+        <button id="vel-copy">Copy summary</button>
+      </div>
+    </details>
+  </section>
+
+  <script>
+    const map = L.map("map").setView([40, -3], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+    // utils
+    function fmtNum(x, d=3) { return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
+    function fmtInt(x) { return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
+    function fmtPct(x, d=1) { return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d)+"%"; }
+
+    function renderVelocitySummary(stats, units="m/s") {
+      if (!stats || !Number.isFinite(stats.count)) {
+        document.querySelector("#step5").style.display = "none";
+        return;
+      }
+      document.querySelector("#step5").style.display = "";
+
+      const total = (stats.count ?? 0) + (stats.nodata_count ?? 0);
+      const nodataPct = total > 0 ? (100 * (stats.nodata_count ?? 0) / total) : NaN;
+
+      // chips
+      document.getElementById("vel-mean").textContent = fmtNum(stats.mean);
+      document.getElementById("vel-min").textContent  = fmtNum(stats.min);
+      document.getElementById("vel-max").textContent  = fmtNum(stats.max);
+      document.getElementById("vel-std").textContent  = fmtNum(stats.std);
+      const ciStr = (stats.ci95_low!=null && stats.ci95_high!=null)
+        ? `${fmtNum(stats.ci95_low)} – ${fmtNum(stats.ci95_high)}`
+        : "—";
+      document.getElementById("vel-ci").textContent = ciStr;
+      document.getElementById("vel-n").textContent  = fmtInt(stats.count);
+
+      // details
+      document.getElementById("vel-count").textContent     = fmtInt(stats.count);
+      document.getElementById("vel-nodata").textContent    = fmtInt(stats.nodata_count);
+      document.getElementById("vel-nodata-pct").textContent= fmtPct(nodataPct);
+      document.getElementById("vel-mean2").textContent     = fmtNum(stats.mean);
+      document.getElementById("vel-std2").textContent      = fmtNum(stats.std);
+      document.getElementById("vel-se").textContent        = fmtNum(stats.se);
+      document.getElementById("vel-p05").textContent       = fmtNum(stats.p05);
+      document.getElementById("vel-p25").textContent       = fmtNum(stats.p25);
+      document.getElementById("vel-p50").textContent       = fmtNum(stats.p50);
+      document.getElementById("vel-p75").textContent       = fmtNum(stats.p75);
+      document.getElementById("vel-p95").textContent       = fmtNum(stats.p95);
+      document.getElementById("vel-range").textContent     = fmtNum(stats.range);
+      document.getElementById("vel-cv").textContent        = fmtNum(stats.cv,1);
+      document.getElementById("vel-ci-low").textContent    = fmtNum(stats.ci95_low);
+      document.getElementById("vel-ci-high").textContent   = fmtNum(stats.ci95_high);
+
+      // export CSV
+      document.getElementById("vel-export").onclick = () => {
+        const rows = [
+          ["metric","value"],
+          ["count", stats.count],
+          ["nodata_count", stats.nodata_count],
+          ["nodata_pct", nodataPct],
+          ["min", stats.min],
+          ["p05", stats.p05],
+          ["p25", stats.p25],
+          ["p50", stats.p50],
+          ["p75", stats.p75],
+          ["p95", stats.p95],
+          ["max", stats.max],
+          ["mean", stats.mean],
+          ["std", stats.std],
+          ["se", stats.se],
+          ["ci95_low", stats.ci95_low],
+          ["ci95_high", stats.ci95_high],
+          ["range", stats.range],
+          ["cv_percent", stats.cv]
+        ];
+        const csv = rows.map(r => r.join(",")).join("\n");
+        const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "velocity_stats.csv";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+
+      // copy summary
+      document.getElementById("vel-copy").onclick = async () => {
+        const summary =
+`Velocity summary (full raster)
+N valid: ${fmtInt(stats.count)} | NoData: ${fmtInt(stats.nodata_count)} (${fmtPct(nodataPct)})
+Mean: ${fmtNum(stats.mean)} ${units}
+Std: ${fmtNum(stats.std)} | SE: ${fmtNum(stats.se)}
+Min–Max: ${fmtNum(stats.min)} – ${fmtNum(stats.max)} ${units}
+p05/p25/p50/p75/p95: ${fmtNum(stats.p05)}, ${fmtNum(stats.p25)}, ${fmtNum(stats.p50)}, ${fmtNum(stats.p75)}, ${fmtNum(stats.p95)}
+95% CI (mean): ${ciStr} ${units}
+Range: ${fmtNum(stats.range)} | CV: ${fmtNum(stats.cv,1)}%`;
+        try { await navigator.clipboard.writeText(summary); } catch {}
+      };
+    }
+
+    // process button
+    document.getElementById("process").onclick = async () => {
+      const f = document.getElementById("csvfile").files[0];
+      if (!f) { alert("Select CSV first"); return; }
+
+      const fd = new FormData();
+      fd.append("csv_file", f);
+      fd.append("grid", 50);
+      fd.append("cell", 100);
+      fd.append("contour", 10);
+
+      const r = await fetch("/run", { method:"POST", body:fd });
+      const js = await r.json();
+
+      // downloads
+      const ul = document.getElementById("downloads");
+      ul.innerHTML = "";
+      for (const [k,v] of Object.entries(js.urls)) {
+        if (v) {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${v}" target="_blank">${k}</a>`;
+          ul.appendChild(li);
+        }
+      }
+
+      // other stats quick view
+      document.getElementById("other-stats").textContent = JSON.stringify(js.stats, null, 2);
+
+      // velocity summary
+      renderVelocitySummary(js?.stats?.velocity, "m/s");
+    };
+  </script>
+</body>
+</html>

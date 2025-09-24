@@ -1,0 +1,235 @@
+﻿id;date;lon;lat;level3_name;level1_name;wild_type;Species;weight;cases
+B1;07/01/2022;8.64;44.620184;Ovada;Piemonte;wild;Sus scrofa;1;1
+B2;14/01/2022;8.839919;44.617492;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B3;14/01/2022;8.69016;44.628823;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B4;14/01/2022;8.88266;44.590246;Fraconalto;Piemonte;wild;Sus scrofa;1;1
+B5;14/01/2022;8.91671;44.648372;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B6;14/01/2022;8.842666;44.62238;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B7;21/01/2022;8.858283;44.703273;Serravalle Scrivia;Piemonte;wild;Sus scrofa;1;1
+B8;21/01/2022;8.725179;44.587761;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B9;21/01/2022;8.911392;44.599186;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B10;21/01/2022;8.82962;44.617003;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B11;21/01/2022;8.754007;44.57251;Lerma;Piemonte;wild;Sus scrofa;1;1
+B12;21/01/2022;8.714525;44.632521;Lerma;Piemonte;wild;Sus scrofa;1;1
+B13;21/01/2022;8.76259;44.572754;Lerma;Piemonte;wild;Sus scrofa;1;1
+B14;21/01/2022;8.792383;44.640819;Bosio;Piemonte;wild;Sus scrofa;1;1
+B15;28/01/2022;8.733306;44.523778;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B16;28/01/2022;8.885699;44.637249;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B17;28/01/2022;8.714282;44.572984;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B18;28/01/2022;8.70851;44.53869;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B19;28/01/2022;8.710556;44.560278;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B20;28/01/2022;8.70849;44.538694;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B21;28/01/2022;8.906972;44.661321;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B22;28/01/2022;8.694007;44.675971;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B23;28/01/2022;8.900037;44.551445;Mignanego;Liguria;wild;Sus scrofa;1;1
+B24;28/01/2022;8.905091;44.63775;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B25;28/01/2022;8.944297;44.432722;Genova;Liguria;wild;Sus scrofa;1;1
+B26;28/01/2022;8.905185;44.645112;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B27;04/02/2022;8.733926;44.559092;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B28;04/02/2022;8.909537;44.537099;Mignanego;Liguria;wild;Sus scrofa;1;1
+B29;04/02/2022;8.913969;44.540151;Mignanego;Liguria;wild;Sus scrofa;1;1
+B30;11/02/2022;8.928037;44.552591;Mignanego;Liguria;wild;Sus scrofa;1;1
+B31;11/02/2022;8.634552;44.669397;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B32;11/02/2022;8.730982;44.663534;Montaldeo;Piemonte;wild;Sus scrofa;1;1
+B33;11/02/2022;8.898732;44.665564;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B34;11/02/2022;8.720282;44.571912;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B35;11/02/2022;8.885699;44.637249;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B36;18/02/2022;8.915512;44.667243;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B37;18/02/2022;8.8846;44.52436;Campomorone;Liguria;wild;Sus scrofa;1;1
+B38;18/02/2022;8.911392;44.665717;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B39;18/02/2022;8.730661;44.6625;Montaldeo;Piemonte;wild;Sus scrofa;1;1
+B40;25/02/2022;8.939166;44.596388;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B41;25/02/2022;8.7028;44.677878;Castelletto d' Orba;Piemonte;wild;Sus scrofa;1;1
+B42;25/02/2022;8.616125;44.640801;Ovada;Piemonte;wild;Sus scrofa;1;1
+B43;04/03/2022;8.90817;44.53559;Mignanego;Liguria;wild;Sus scrofa;1;1
+B44;04/03/2022;8.91948;44.66114;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B45;04/03/2022;8.682586;44.695971;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B46;04/03/2022;8.597968;44.600359;Molare;Piemonte;wild;Sus scrofa;1;1
+B47;04/03/2022;8.634552;44.669397;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B48;04/03/2022;8.640363;44.605489;Ovada;Piemonte;wild;Sus scrofa;1;1
+B49;04/03/2022;8.916027;44.676093;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B50;04/03/2022;8.699066;44.68331;Castelletto d' Orba;Piemonte;wild;Sus scrofa;1;1
+B51;04/03/2022;8.716033;44.615008;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B52;04/03/2022;8.690123;44.679374;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B53;04/03/2022;8.920639;44.617369;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B54;11/03/2022;8.85022;44.58673;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B55;11/03/2022;8.646929;44.624582;Ovada;Piemonte;wild;Sus scrofa;1;1
+B56;11/03/2022;8.728565;44.635984;Casaleggio Boiro;Piemonte;wild;Sus scrofa;1;1
+B57;11/03/2022;8.693741;44.573854;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B58;11/03/2022;8.692933;44.573013;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B59;11/03/2022;8.693528;44.572726;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B60;11/03/2022;8.69538;44.570389;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B61;11/03/2022;8.702313;44.54099;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B62;18/03/2022;8.828815;44.633169;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B63;18/03/2022;8.828461;44.633253;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B64;18/03/2022;8.636758;44.609278;Ovada;Piemonte;wild;Sus scrofa;1;1
+B65;18/03/2022;8.938263;44.582361;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B66;18/03/2022;8.690123;44.679374;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B67;18/03/2022;8.704022;44.613252;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B68;18/03/2022;8.643134;44.607378;Ovada;Piemonte;wild;Sus scrofa;1;1
+B69;18/03/2022;8.857901;44.593339;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B70;25/03/2022;8.856125;44.691425;Gavi;Piemonte;wild;Sus scrofa;1;1
+B71;25/03/2022;8.950113;44.59541;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B72;25/03/2022;8.682638;44.559527;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B73;25/03/2022;8.686714;44.544597;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B74;25/03/2022;8.778724;44.569035;Bosio;Piemonte;wild;Sus scrofa;1;1
+B75;25/03/2022;8.858874;44.656788;Gavi;Piemonte;wild;Sus scrofa;1;1
+B76;01/04/2022;8.781174;44.699303;Gavi;Piemonte;wild;Sus scrofa;1;1
+B77;01/04/2022;8.756481;44.622632;Mornese;Piemonte;wild;Sus scrofa;1;1
+B78;01/04/2022;8.86054;44.596525;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B79;01/04/2022;8.727802;44.651758;Montaldeo;Piemonte;wild;Sus scrofa;1;1
+B80;01/04/2022;8.880965;44.682562;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B81;01/04/2022;8.870942;44.650387;Gavi;Piemonte;wild;Sus scrofa;1;1
+B82;01/04/2022;8.588301;44.582909;Molare;Piemonte;wild;Sus scrofa;1;1
+B83;08/04/2022;8.94008;44.5901;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B84;08/04/2022;8.598204;44.600222;Molare;Piemonte;wild;Sus scrofa;1;1
+B85;08/04/2022;8.598462;44.600038;Molare;Piemonte;wild;Sus scrofa;1;1
+B86;08/04/2022;8.903324;44.598375;Fraconalto;Piemonte;wild;Sus scrofa;1;1
+B87;08/04/2022;8.647229;44.613188;Ovada;Piemonte;wild;Sus scrofa;1;1
+B88;08/04/2022;8.55;44.642308;Prasco;Piemonte;wild;Sus scrofa;1;1
+B89;08/04/2022;8.948103;44.611888;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B90;08/04/2022;8.853642;44.588625;Voltaggio;Piemonte;wild;Sus scrofa;1;1
+B91;08/04/2022;8.611996;44.622811;Ovada;Piemonte;wild;Sus scrofa;1;1
+B92;08/04/2022;8.696067;44.667365;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B93;15/04/2022;8.698117;44.550034;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B94;15/04/2022;8.698118;44.550035;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B95;15/04/2022;8.840171;44.686834;Gavi;Piemonte;wild;Sus scrofa;1;1
+B96;15/04/2022;8.683611;44.563888;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B97;15/04/2022;8.695015;44.666556;Silvano d' Orba;Piemonte;wild;Sus scrofa;1;1
+B98;15/04/2022;8.907805;44.543277;Mignanego;Liguria;wild;Sus scrofa;1;1
+B99;22/04/2022;8.660635;44.579593;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B100;22/04/2022;8.943759;44.569797;Busalla;Liguria;wild;Sus scrofa;1;1
+B101;22/04/2022;8.941819;44.571885;Busalla;Liguria;wild;Sus scrofa;1;1
+B102;22/04/2022;8.876459;44.678412;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B103;29/04/2022;8.697453;44.54072;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B104;29/04/2022;8.721435;44.604188;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B105;29/04/2022;8.842928;44.660479;Carrosio;Piemonte;wild;Sus scrofa;1;1
+B106;29/04/2022;8.864516;44.709497;Serravalle Scrivia;Piemonte;wild;Sus scrofa;1;1
+B107;06/05/2022;8.700569;44.537756;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B108;06/05/2022;8.699619;44.542135;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B109;06/05/2022;8.780435;44.598328;Bosio;Piemonte;wild;Sus scrofa;1;1
+B110;06/05/2022;8.721938;44.668471;Montaldeo;Piemonte;wild;Sus scrofa;1;1
+B111;06/05/2022;8.94105;44.562;Mignanego;Liguria;wild;Sus scrofa;1;1
+B112;06/05/2022;8.933752;44.687976;Grondona;Piemonte;wild;Sus scrofa;1;1
+B113;06/05/2022;8.848765;44.68382;Gavi;Piemonte;wild;Sus scrofa;1;1
+B114;06/05/2022;8.925169;44.683735;Grondona;Piemonte;wild;Sus scrofa;1;1
+B115;06/05/2022;8.716542;44.611941;Tagliolo Monferrato;Piemonte;wild;Sus scrofa;1;1
+B116;06/05/2022;8.648246;44.569753;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B117;13/05/2022;8.895296;44.702468;Vignole Borbera;Piemonte;wild;Sus scrofa;1;1
+B118;13/05/2022;8.858945;44.700182;Serravalle Scrivia;Piemonte;wild;Sus scrofa;1;1
+B119;13/05/2022;8.93596;44.613423;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B120;20/05/2022;8.672214;44.573299;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B121;20/05/2022;8.895561;44.700478;Vignole Borbera;Piemonte;wild;Sus scrofa;1;1
+B122;20/05/2022;8.897103;44.695172;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B123;20/05/2022;8.897946;44.707455;Vignole Borbera;Piemonte;wild;Sus scrofa;1;1
+B124;20/05/2022;8.680503;44.544627;Campo Ligure;Liguria;wild;Sus scrofa;1;1
+B125;20/05/2022;8.939425;44.556424;Mignanego;Liguria;wild;Sus scrofa;1;1
+B126;27/05/2022;8.599449;44.599011;Molare;Piemonte;wild;Sus scrofa;1;1
+B127;27/05/2022;8.74842;44.522137;Masone;Liguria;wild;Sus scrofa;1;1
+B128;27/05/2022;8.706664;44.56188;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B129;27/05/2022;8.705436;44.515818;Masone;Liguria;wild;Sus scrofa;1;1
+B130;27/05/2022;8.707959;44.515546;Masone;Liguria;wild;Sus scrofa;1;1
+B131;27/05/2022;8.758972;44.681019;Parodi Ligure;Piemonte;wild;Sus scrofa;1;1
+B132;27/05/2022;8.90152;44.6878;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B133;27/05/2022;8.901521;44.68781;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B134;03/06/2022;8.753156;44.587844;Casaleggio Boiro;Piemonte;wild;Sus scrofa;1;1
+B135;03/06/2022;8.753306;44.587982;Casaleggio Boiro;Piemonte;wild;Sus scrofa;1;1
+B136;03/06/2022;8.702236;44.67769;Castelletto d' Orba;Piemonte;wild;Sus scrofa;1;1
+B137;03/06/2022;8.554398;44.591651;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B138;03/06/2022;8.584643;44.606928;Molare;Piemonte;wild;Sus scrofa;1;1
+B139;03/06/2022;8.815706;44.724337;Novi Ligure;Piemonte;wild;Sus scrofa;1;1
+B140;10/06/2022;8.550278;44.580511;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B141;10/06/2022;8.744531;44.668797;Parodi Ligure;Piemonte;wild;Sus scrofa;1;1
+B142;10/06/2022;8.62409;44.666924;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B143;10/06/2022;8.818821;44.721304;Gavi;Piemonte;wild;Sus scrofa;1;1
+B144;10/06/2022;8.894126;44.704126;Vignole Borbera;Piemonte;wild;Sus scrofa;1;1
+B145;10/06/2022;8.893171;44.703757;Vignole Borbera;Piemonte;wild;Sus scrofa;1;1
+B146;10/06/2022;8.931295;44.542737;Mignanego;Liguria;wild;Sus scrofa;1;1
+B147;17/06/2022;8.941277;44.512493;Serra Riccò;Liguria;wild;Sus scrofa;1;1
+B148;17/06/2022;8.563153;44.596251;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B149;17/06/2022;8.82027;44.719844;Gavi;Piemonte;wild;Sus scrofa;1;1
+B150;17/06/2022;8.820334;44.719905;Gavi;Piemonte;wild;Sus scrofa;1;1
+B151;17/06/2022;8.704817;44.680716;Castelletto d' Orba;Piemonte;wild;Sus scrofa;1;1
+B152;17/06/2022;8.548755;44.587939;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B153;17/06/2022;8.91184;44.50272;Serra Riccò;Liguria;wild;Sus scrofa;1;1
+B154;24/06/2022;8.543594;44.585165;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B155;24/06/2022;8.9988;44.5235;Casella;Liguria;wild;Sus scrofa;1;1
+B156;24/06/2022;8.653058;44.674603;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B157;24/06/2022;8.901554;44.688001;Arquata Scrivia;Piemonte;wild;Sus scrofa;1;1
+B158;01/07/2022;8.94404;44.55769;Mignanego;Liguria;wild;Sus scrofa;1;1
+B159;01/07/2022;8.627381;44.653271;Ovada;Piemonte;wild;Sus scrofa;1;1
+B160;08/07/2022;8.562788;44.596908;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B161;08/07/2022;8.515056;44.601173;Morbello;Piemonte;wild;Sus scrofa;1;1
+B162;08/07/2022;8.508683;44.591708;Morbello;Piemonte;wild;Sus scrofa;1;1
+B163;08/07/2022;8.653359;44.674035;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B164;08/07/2022;8.583613;44.609556;Molare;Piemonte;wild;Sus scrofa;1;1
+B165;08/07/2022;8.653681;44.674615;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B166;08/07/2022;8.93922;44.515557;Serra Riccò;Liguria;wild;Sus scrofa;1;1
+B167;15/07/2022;8.526128;44.595665;Morbello;Piemonte;wild;Sus scrofa;1;1
+B168;15/07/2022;8.526128;44.595665;Morbello;Piemonte;wild;Sus scrofa;1;1
+B169;15/07/2022;8.519648;44.589003;Morbello;Piemonte;wild;Sus scrofa;1;1
+B170;15/07/2022;8.549634;44.589788;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B171;27/07/2022;8.639376;44.651577;Ovada;Piemonte;wild;Sus scrofa;1;1
+B172;27/07/2022;8.898048;44.537257;Mignanego;Liguria;wild;Sus scrofa;1;1
+B173;27/07/2022;8.547965;44.630774;Cremolino;Piemonte;wild;Sus scrofa;1;1
+B174;27/07/2022;8.9683;44.57834;Busalla;Liguria;wild;Sus scrofa;1;1
+B175;27/07/2022;8.5509;44.605013;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B176;27/07/2022;8.551608;44.60412;Cassinelle;Piemonte;wild;Sus scrofa;1;1
+B177;10/08/2022;8.818506;44.72151;Gavi;Piemonte;wild;Sus scrofa;1;1
+B178;10/08/2022;8.487455;44.59329;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B179;10/08/2022;8.487766;44.595399;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B180;10/08/2022;8.558694;44.639172;Cremolino;Piemonte;wild;Sus scrofa;1;1
+B181;10/08/2022;8.456771;44.578222;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B182;10/08/2022;8.487176;44.593144;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B183;24/08/2022;8.87124;44.52448;Campomorone;Liguria;wild;Sus scrofa;1;1
+B184;31/08/2022;8.9633;44.577;Busalla;Liguria;wild;Sus scrofa;1;1
+B185;21/09/2022;8.973348;44.58119;Busalla;Liguria;wild;Sus scrofa;1;1
+B186;19/10/2022;8.970933;44.58028;Busalla;Liguria;wild;Sus scrofa;1;1
+B187;26/10/2022;8.517195;44.55253;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B188;26/10/2022;8.97453;44.58;Busalla;Liguria;wild;Sus scrofa;1;1
+B189;02/11/2022;8.650935;44.68841;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B190;02/11/2022;8.9909;44.586;Busalla;Liguria;wild;Sus scrofa;1;1
+B191;09/11/2022;8.494719;44.56472;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B192;16/11/2022;8.949373;44.70014;Grondona;Piemonte;wild;Sus scrofa;1;1
+B193;16/11/2022;8.9885;44.596;Busalla;Liguria;wild;Sus scrofa;1;1
+B194;16/11/2022;8.9881;44.596;Busalla;Liguria;wild;Sus scrofa;1;1
+B195;23/11/2022;8.816194;44.73353;Novi Ligure;Piemonte;wild;Sus scrofa;1;1
+B196;30/11/2022;8.9939;44.6;Busalla;Liguria;wild;Sus scrofa;1;1
+B197;30/11/2022;8.817267;44.72733;Novi Ligure;Piemonte;wild;Sus scrofa;1;1
+B198;07/12/2022;8.481157;44.59374;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B199;07/12/2022;8.48076;44.5932;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B200;07/12/2022;8.46059;44.5813;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B201;07/12/2022;8.759826;44.73726;Tassarolo;Piemonte;wild;Sus scrofa;1;1
+B202;14/12/2022;8.93721;44.522;Serra Riccò;Liguria;wild;Sus scrofa;1;1
+B203;14/12/2022;8.724073;44.66988;Montaldeo;Piemonte;wild;Sus scrofa;1;1
+B204;14/12/2022;8.494509;44.61501;Grognardo;Piemonte;wild;Sus scrofa;1;1
+B205;21/12/2022;8.502624;44.65489;Visone;Piemonte;wild;Sus scrofa;1;1
+B206;21/12/2022;8.947656;44.70014;Grondona;Piemonte;wild;Sus scrofa;1;1
+B207;21/12/2022;8.961089;44.69587;Grondona;Piemonte;wild;Sus scrofa;1;1
+B208;21/12/2022;8.42488;44.5342;Pareto;Piemonte;wild;Sus scrofa;1;1
+B209;21/12/2022;8.6576;44.568;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B210;21/12/2022;8.529204;44.49408;Sassello;Liguria;wild;Sus scrofa;1;1
+B211;28/12/2022;8.9663;44.643;Isola Del Cantone;Liguria;wild;Sus scrofa;1;1
+B212;28/12/2022;8.9665;44.567;Savignone;Liguria;wild;Sus scrofa;1;1
+B213;28/12/2022;8.647052;44.67358;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B214;28/12/2022;8.464876;44.57995;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B215;28/12/2022;8.644091;44.70142;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B216;28/12/2022;9.0221;44.584;Crocefieschi;Liguria;wild;Sus scrofa;1;1
+B217;28/12/2022;9.042;44.57;Crocefieschi;Liguria;wild;Sus scrofa;1;1
+B218;28/12/2022;8.518827;44.61022;Morbello;Piemonte;wild;Sus scrofa;1;1
+B219;28/12/2022;8.9664;44.609;Ronco Scrivia;Liguria;wild;Sus scrofa;1;1
+B220;04/01/2023;8.636259;44.67534;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B221;04/01/2023;8.518553;44.57743;Morbello;Piemonte;wild;Sus scrofa;1;1
+B222;04/01/2023;8.517609;44.57893;Morbello;Piemonte;wild;Sus scrofa;1;1
+B223;04/01/2023;8.489901;44.54761;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B224;04/01/2023;8.495581;44.61032;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B225;04/01/2023;8.653275;44.68669;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B226;04/01/2023;8.652009;44.68629;Rocca Grimalda;Piemonte;wild;Sus scrofa;1;1
+B227;04/01/2023;8.969216;44.69246;Grondona;Piemonte;wild;Sus scrofa;1;1
+B228;04/01/2023;8.660662;44.5796;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B229;04/01/2023;8.499116;44.66327;Visone;Piemonte;wild;Sus scrofa;1;1
+B230;04/01/2023;8.481907;44.569831;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B231;04/01/2023;8.417692;44.5991;Cartosio;Piemonte;wild;Sus scrofa;1;1
+B232;04/01/2023;8.66;44.579;Rossiglione;Liguria;wild;Sus scrofa;1;1
+B233;04/01/2023;8.484902;44.5626;Ponzone;Piemonte;wild;Sus scrofa;1;1
+B234;04/01/2023;8.508511;44.59944;Morbello;Piemonte;wild;Sus scrofa;1;1
