@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from frontwave import run_frontwave  # tu módulo que genera los resultados
-
+ 
 app = FastAPI(title="FrontWave API")
 
 # CORS
