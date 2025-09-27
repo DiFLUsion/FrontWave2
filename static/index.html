@@ -11,7 +11,6 @@
     header { background:#333; color:#fff; padding:1rem }
     section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
     .row { display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center }
-    .row > * { margin:0.25rem 0 }
     label { font-size:0.9rem }
     select, input[type="text"], input[type="number"] { padding:0.3rem }
     .muted { color:#555; font-size:0.9em }
@@ -45,7 +44,7 @@
       </label>
       <button id="preview">Previsualizar</button>
     </div>
-    <div class="row">
+    <div class="row" style="margin-top:.5rem">
       <label>lon: <select id="lon_field"></select></label>
       <label>lat: <select id="lat_field"></select></label>
       <label>date: <select id="date_field"></select></label>
@@ -87,16 +86,24 @@
   </section>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- CDNs con MIME correcto -->
+
+  <!-- Librerías locales para evitar MIME nosniff -->
+  <script src="/static/libs/geotiff.min.js"></script>
+  <script src="/static/libs/georaster.min.js"></script>
+  <script src="/static/libs/georaster-layer-for-leaflet.min.js"></script>
+
+  <!-- PapaParse local o CDN (MIME correcto en jsDelivr suele ir bien; si prefieres, ponlo en /static/libs también) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.0.7/dist-browser/geotiff.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/georaster@1.6.1/dist/georaster.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/georaster-layer-for-leaflet@3.11.0/dist/georaster-layer-for-leaflet.min.js"></script>
 
   <script>
+    // Verificación de dependencias
+    if (typeof parseGeoraster === "undefined") {
+      alert("Error cargando georaster*. Usa los .js locales en /static/libs.");
+    }
+
     // --- mapa ---
     const map = L.map("map").setView([40, -3], 5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
     const overlays = {};
     const layerControl = L.control.layers(null, overlays).addTo(map);
     let rasterLayers = [];
@@ -122,35 +129,44 @@
     function clearVectors(){ vectorLayers.forEach(l=>{try{layerControl.removeLayer(l); map.removeLayer(l);}catch{}}); vectorLayers=[]; }
 
     async function addRaster(name, url){
-      const ab = await fetch(url).then(r=>r.arrayBuffer());
-      const georaster = await parseGeoraster(ab);
-      const stats = georaster.statistics?.[0] || {};
-      const min = Number.isFinite(stats.min) ? stats.min : (georaster.mins?.[0] ?? 0);
-      const max = Number.isFinite(stats.max) ? stats.max : (georaster.maxs?.[0] ?? 1);
-      const layer = new GeoRasterLayer({
-        georaster, opacity:0.75, resolution:256,
-        pixelValuesToColorFn: values => {
-          const v = values[0]; if (v==null || Number.isNaN(v)) return null;
-          const t = (max-min) ? Math.min(1, Math.max(0, (v-min)/(max-min))) : 0.5;
-          const g = Math.round(255*t); return `rgb(${g},${g},${g})`;
-        }
-      }).addTo(map);
-      rasterLayers.push(layer);
-      overlays[name]=layer; layerControl.addOverlay(layer, name);
-      try{ map.fitBounds(layer.getBounds()); }catch{}
+      try{
+        const ab = await fetch(url).then(r=>r.arrayBuffer());
+        const georaster = await parseGeoraster(ab);
+        const stats = georaster.statistics?.[0] || {};
+        const min = Number.isFinite(stats.min) ? stats.min : (georaster.mins?.[0] ?? 0);
+        const max = Number.isFinite(stats.max) ? stats.max : (georaster.maxs?.[0] ?? 1);
+        const layer = new GeoRasterLayer({
+          georaster, opacity:0.75, resolution:256,
+          pixelValuesToColorFn: values => {
+            const v = values[0]; if (v==null || Number.isNaN(v)) return null;
+            const t = (max-min) ? Math.min(1, Math.max(0, (v-min)/(max-min))) : 0.5;
+            const g = Math.round(255*t); return `rgb(${g},${g},${g})`;
+          }
+        }).addTo(map);
+        rasterLayers.push(layer);
+        overlays[name]=layer; layerControl.addOverlay(layer, name);
+        try{ map.fitBounds(layer.getBounds()); }catch{}
+      }catch(e){
+        console.error("addRaster error", name, e);
+        alert(`No se pudo cargar el raster ${name}.`);
+      }
     }
 
     async function addPoints(name, url){
-      const gj = await fetch(url).then(r=>r.json());
-      const layer = L.geoJSON(gj, {
-        pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
-      }).addTo(map);
-      vectorLayers.push(layer);
-      overlays[name]=layer; layerControl.addOverlay(layer, name);
-      try{ map.fitBounds(layer.getBounds()); }catch{}
+      try{
+        const gj = await fetch(url).then(r=>r.json());
+        const layer = L.geoJSON(gj, {
+          pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
+        }).addTo(map);
+        vectorLayers.push(layer);
+        overlays[name]=layer; layerControl.addOverlay(layer, name);
+        try{ map.fitBounds(layer.getBounds()); }catch{}
+      }catch(e){
+        console.error("addPoints error", name, e);
+      }
     }
 
-    // --- preview CSV con PapaParse ---
+    // --- preview CSV ---
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
       headers.forEach(h=>{
@@ -170,7 +186,7 @@
       headers.forEach(h=>{ const th=document.createElement("th"); th.textContent=h; trh.appendChild(th); });
       thead.appendChild(trh);
       const tbody = document.createElement("tbody");
-      rows.forEach(r=>{
+      rows.slice(0,50).forEach(r=>{
         const tr = document.createElement("tr");
         headers.forEach(h=>{ const td=document.createElement("td"); td.textContent = r[h]; tr.appendChild(td); });
         tbody.appendChild(tr);
@@ -189,30 +205,21 @@
       if(!f){ alert("Selecciona un CSV"); return; }
       const sep = currentSep();
       Papa.parse(f, {
-        delimiter: sep,
-        header: true,
-        dynamicTyping: false,
-        preview: 200,   // máximo filas para previsualizar
-        skipEmptyLines: true,
+        delimiter: sep, header: true, dynamicTyping: false, preview: 200, skipEmptyLines: true,
         complete: res => {
           const data = res.data || [];
           if(!data.length){ alert("CSV vacío o separador incorrecto"); return; }
           const headers = res.meta.fields || Object.keys(data[0]);
-
           fillSelectOptions(document.getElementById("lon_field"), headers, "lon");
           fillSelectOptions(document.getElementById("lat_field"), headers, "lat");
           fillSelectOptions(document.getElementById("date_field"), headers, "date");
           fillSelectOptions(document.getElementById("id_field"), headers, "id");
           fillSelectOptions(document.getElementById("weight_field"), headers, "weight");
           fillSelectOptions(document.getElementById("case_field"), headers, "cases");
-
-          renderPreviewTable(headers, data.slice(0, 50));
-
-          // info de preview
+          renderPreviewTable(headers, data);
           const info = document.getElementById("preview-info");
-          info.style.display="";
-          info.innerHTML = "";
-          const chip = txt => { const d=document.createElement("div"); d.className="chip"; d.textContent=txt; return d; };
+          info.style.display=""; info.innerHTML = "";
+          const chip = t => { const d=document.createElement("div"); d.className="chip"; d.textContent=t; return d; };
           info.appendChild(chip(`Filas (preview): ${data.length}`));
           info.appendChild(chip(`Separador: ${sep === "\t" ? "tab" : sep}`));
         }
@@ -228,9 +235,7 @@
       fd.append("grid", document.getElementById("grid").value || 12000);
       fd.append("cell", document.getElementById("cell").value || 1200);
       fd.append("contour", document.getElementById("contour").value || 30);
-      fd.append("sep", document.getElementById("sep").value); // puede ser "\\t"
-
-      // campos seleccionados
+      fd.append("sep", document.getElementById("sep").value);
       fd.append("lon_field", document.getElementById("lon_field").value || "lon");
       fd.append("lat_field", document.getElementById("lat_field").value || "lat");
       fd.append("date_field", document.getElementById("date_field").value || "date");
@@ -241,7 +246,6 @@
       const r = await fetch("/run", { method:"POST", body:fd });
       const js = await r.json();
 
-      // descargas
       const ul = document.getElementById("downloads");
       ul.innerHTML="";
       for (const [k,v] of Object.entries(js.urls)) {
@@ -252,10 +256,7 @@
         }
       }
 
-      // estadísticas
       renderVelocitySummary(js?.stats?.velocity);
-
-      // capas
       clearRasters(); clearVectors();
       if (js.urls.kriging)  await addRaster("kriging",  js.urls.kriging);
       if (js.urls.slope)    await addRaster("slope",    js.urls.slope);
