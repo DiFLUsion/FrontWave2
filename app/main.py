@@ -80,27 +80,33 @@ def _raster_stats(path: str) -> dict:
     }
 
 def _quicklook_png(src_tif: str, dst_png: str):
-    """Genera PNG RGBA y devuelve bounds [[s,w],[n,e]] en EPSG:4326."""
+    """Convierte un GeoTIFF (EPSG:4326) en PNG RGBA + bounds Leaflet [[S,W],[N,E]]."""
     with rasterio.open(src_tif) as src:
-        arr = src.read(1, masked=True)
-        bounds = src.bounds  # left, bottom, right, top (w, s, e, n)
-    data = np.array(arr, dtype=np.float64)
-    mask = ~np.isfinite(data)
-    if np.all(mask):
-        gray = np.zeros_like(data, dtype=np.uint8)
+        arr = src.read(1, masked=True)  # masked array (H, W)
+        bounds = src.bounds  # (left=W, bottom=S, right=E, top=N)
+    data = np.ma.filled(arr, np.nan).astype(np.float64)
+    valid = np.isfinite(data)
+
+    if valid.sum() == 0:
+        h, w = data.shape
+        rgba = np.zeros((4, h, w), dtype=np.uint8)
     else:
-        vmin = np.nanmin(data[~mask]); vmax = np.nanmax(data[~mask])
+        vmin = np.nanpercentile(data, 2)
+        vmax = np.nanpercentile(data, 98)
         if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-            gray = np.full_like(data, 127, dtype=np.uint8)
-        else:
-            scaled = (data - vmin) / (vmax - vmin)
-            gray = np.clip(np.round(scaled * 255), 0, 255).astype(np.uint8)
-    alpha = np.where(mask, 0, 255).astype(np.uint8)
-    rgba = np.stack([gray, gray, gray, alpha], axis=0)  # (4, H, W)
-    h, w = gray.shape
+            vmin = np.nanmin(data); vmax = np.nanmax(data)
+            if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
+                vmin, vmax = 0.0, 1.0
+        scaled = (data - vmin) / (vmax - vmin)
+        gray = np.clip(np.round(scaled * 255), 0, 255).astype(np.uint8)
+        alpha = np.where(valid, 255, 0).astype(np.uint8)
+        rgba = np.stack([gray, gray, gray, alpha], axis=0)
+
+    h, w = rgba.shape[1], rgba.shape[2]
     profile = {"driver": "PNG", "height": h, "width": w, "count": 4, "dtype": "uint8"}
     with rasterio.open(dst_png, "w", **profile) as dst:
         dst.write(rgba)
+
     return [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
 
 @app.post("/run")
@@ -117,7 +123,8 @@ async def run_process(
     weight_field: str = Form("weight"),
     case_field: str = Form("cases"),
 ):
-    if sep.lower() in ("\\t", "tab", "tabs"): sep = "\t"
+    if sep.lower() in ("\\t", "tab", "tabs"):
+        sep = "\t"
 
     tmp_csv = os.path.join(TMP_DIR, csv_file.filename)
     with open(tmp_csv, "wb") as f:
@@ -136,7 +143,6 @@ async def run_process(
         sep=sep, dayfirst=True
     )
 
-    # GeoJSON puntos
     selected_geojson = None
     try:
         if gpd and res.get("selected_points") and os.path.exists(res["selected_points"]):
@@ -146,7 +152,6 @@ async def run_process(
     except Exception:
         selected_geojson = None
 
-    # Quicklooks PNG + bounds para Leaflet (sin libs extra)
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
@@ -179,7 +184,6 @@ async def run_process(
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
 
     return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats})
-
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

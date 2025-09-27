@@ -1,3 +1,4 @@
+<!-- static/index.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -88,7 +89,6 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    // mapa
     const map = L.map("map").setView([40, -3], 5);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
     const overlays = {};
@@ -116,7 +116,7 @@
     function clearVectors(){ vectorLayers.forEach(l=>{try{layerControl.removeLayer(l); map.removeLayer(l);}catch{}}); vectorLayers=[]; }
 
     function addImage(name, url, bounds){
-      const layer = L.imageOverlay(url, bounds, {opacity:0.75});
+      const layer = L.imageOverlay(url, bounds, {opacity:0.85, zIndex: 500});
       layer.addTo(map);
       rasterLayers.push(layer);
       overlays[name] = layer;
@@ -136,7 +136,6 @@
       }catch(e){ console.error("addPoints", e); }
     }
 
-    // preview CSV
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
       headers.forEach(h=>{
