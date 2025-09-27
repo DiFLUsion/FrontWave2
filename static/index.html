@@ -100,8 +100,9 @@
     function fmi(x){ return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
 
     function renderVelocitySummary(stats){
-      if(!stats || !Number.isFinite(stats.count)){ document.getElementById("stats-card").style.display="none"; return; }
-      document.getElementById("stats-card").style.display="";
+      const card = document.getElementById("stats-card");
+      if(!stats || !Number.isFinite(stats.count)){ card.style.display="none"; return; }
+      card.style.display="";
       document.getElementById("vel-n").textContent = fmi(stats.count);
       document.getElementById("vel-mean").textContent = fmt(stats.mean);
       document.getElementById("vel-min").textContent = fmt(stats.min);
@@ -124,18 +125,22 @@
       try { map.fitBounds(layer.getBounds()); } catch {}
     }
 
-    async function addPoints(name, url){
-      try{
-        const gj = await fetch(url).then(r=>r.json());
-        const layer = L.geoJSON(gj, {
-          pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
-        }).addTo(map);
-        vectorLayers.push(layer);
-        overlays[name]=layer; layerControl.addOverlay(layer, name);
-        try{ map.fitBounds(layer.getBounds()); }catch{}
-      }catch(e){ console.error("addPoints", e); }
+    async function addGeoJSON(name, url, kind){
+      const gj = await fetch(url).then(r=>r.json());
+      const layer = L.geoJSON(gj, {
+        style: (f) => {
+          if (kind === "contours") return {color:"#0066cc", weight:1.5, opacity:0.9};
+          if (kind === "ellipse")  return {color:"#aa8800", weight:2, fillColor:"#ffdd77", fillOpacity:0.2};
+          return {color:"#d33", weight:1};
+        },
+        pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
+      }).addTo(map);
+      vectorLayers.push(layer);
+      overlays[name]=layer; layerControl.addOverlay(layer, name);
+      try{ map.fitBounds(layer.getBounds()); }catch{}
     }
 
+    // preview CSV
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
       headers.forEach(h=>{
@@ -231,7 +236,10 @@
       if (js.images?.kriging)  addImage("kriging",  js.images.kriging.url,  js.images.kriging.bounds);
       if (js.images?.slope)    addImage("slope",    js.images.slope.url,    js.images.slope.bounds);
       if (js.images?.velocity) addImage("velocity", js.images.velocity.url, js.images.velocity.bounds);
-      if (js.urls.selected_points_geojson) addPoints("selected points", js.urls.selected_points_geojson);
+
+      if (js.urls.contours_geojson)        await addGeoJSON("contours", js.urls.contours_geojson, "contours");
+      if (js.urls.ellipse_geojson)         await addGeoJSON("ellipse",  js.urls.ellipse_geojson,  "ellipse");
+      if (js.urls.selected_points_geojson) await addGeoJSON("selected points", js.urls.selected_points_geojson, "points");
     };
   </script>
 </body>

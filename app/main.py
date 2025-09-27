@@ -28,11 +28,8 @@ except ImportError:
         sys.path.append(BASE_DIR)
     from frontwave import run_frontwave
 
-# geopandas opcional
-try:
-    import geopandas as gpd
-except Exception:
-    gpd = None
+# geopandas
+import geopandas as gpd  # requerido por frontwave.py
 
 app = FastAPI(title="FrontWave API")
 
@@ -80,10 +77,10 @@ def _raster_stats(path: str) -> dict:
     }
 
 def _quicklook_png(src_tif: str, dst_png: str):
-    """Convierte un GeoTIFF (EPSG:4326) en PNG RGBA + bounds Leaflet [[S,W],[N,E]]."""
+    """PNG RGBA + bounds Leaflet [[S,W],[N,E]] desde GeoTIFF WGS84."""
     with rasterio.open(src_tif) as src:
-        arr = src.read(1, masked=True)  # masked array (H, W)
-        bounds = src.bounds  # (left=W, bottom=S, right=E, top=N)
+        arr = src.read(1, masked=True)
+        bounds = src.bounds  # (W,S,E,N)
     data = np.ma.filled(arr, np.nan).astype(np.float64)
     valid = np.isfinite(data)
 
@@ -143,15 +140,28 @@ async def run_process(
         sep=sep, dayfirst=True
     )
 
-    selected_geojson = None
-    try:
-        if gpd and res.get("selected_points") and os.path.exists(res["selected_points"]):
-            gdf = gpd.read_file(res["selected_points"], layer="selected_pts")
-            selected_geojson = os.path.join(out_dir, "selected_points.geojson")
-            gdf.to_file(selected_geojson, driver="GeoJSON")
-    except Exception:
-        selected_geojson = None
+    # GeoJSON en EPSG:4326 para mostrar en Leaflet
+    def to_url(p):
+        if not p: return None
+        p = os.path.abspath(p).replace("\\", "/")
+        rel = os.path.relpath(p, DATA_DIR).replace("\\", "/")
+        return f"/data/{rel}"
 
+    def export_geojson(gpkg_path, layer, out_name):
+        if not gpkg_path or not os.path.exists(gpkg_path):
+            return None
+        gdf = gpd.read_file(gpkg_path, layer=layer)
+        if gdf.crs is not None and str(gdf.crs).lower() != "epsg:4326":
+            gdf = gdf.to_crs("EPSG:4326")
+        out_path = os.path.join(out_dir, out_name)
+        gdf.to_file(out_path, driver="GeoJSON")
+        return to_url(out_path)
+
+    points_geojson   = export_geojson(res.get("selected_points"), "selected_pts", "selected_points.geojson")
+    ellipse_geojson  = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
+    contours_geojson = export_geojson(res.get("contours"), "contours", "contours.geojson")
+
+    # Quicklooks PNG para rasters (sin dependencias de cliente)
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
@@ -160,15 +170,9 @@ async def run_process(
         rel = os.path.relpath(png_path, DATA_DIR).replace("\\", "/")
         images[key] = {"url": f"/data/{rel}", "bounds": bounds}
 
-    add_img("kriging", res.get("kriging"))
-    add_img("slope",   res.get("slope"))
-    add_img("velocity",res.get("velocity"))
-
-    def to_url(p):
-        if not p: return None
-        p = os.path.abspath(p).replace("\\", "/")
-        rel = os.path.relpath(p, DATA_DIR).replace("\\", "/")
-        return f"/data/{rel}"
+    add_img("kriging",  res.get("kriging"))
+    add_img("slope",    res.get("slope"))
+    add_img("velocity", res.get("velocity"))
 
     urls = {
         "kriging": to_url(res.get("kriging")),
@@ -177,8 +181,10 @@ async def run_process(
         "contours": to_url(res.get("contours")),
         "ellipse": to_url(res.get("ellipse")),
         "selected_points": to_url(res.get("selected_points")),
-        "selected_points_geojson": to_url(selected_geojson),
         "grid": to_url(res.get("grid")),
+        "selected_points_geojson": points_geojson,
+        "ellipse_geojson": ellipse_geojson,
+        "contours_geojson": contours_geojson,
     }
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
