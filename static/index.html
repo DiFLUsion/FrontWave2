@@ -5,7 +5,8 @@
   <meta charset="UTF-8" />
   <title>FrontWave - Viewer</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/static/libs/leaflet.css" />
+  <!-- Leaflet desde CDN para evitar 404 en /static/libs -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     body { margin:0; font-family:sans-serif }
     header { background:#333; color:#fff; padding:1rem }
@@ -21,7 +22,6 @@
     .actions { margin-top:0.5rem; display:flex; gap:0.5rem }
     #map { height:400px; margin:1rem }
   </style>
-  <script src="/static/libs/leaflet.js"></script>
 </head>
 <body>
   <header>
@@ -30,32 +30,27 @@
     <p class="muted">Upload CSV → Process → Visualize results</p>
   </header>
 
-  <!-- Step 1 · Upload -->
   <section class="card">
     <h2>Step 1 · Upload CSV</h2>
     <input type="file" id="csvfile" accept=".csv" />
     <button id="process">Process</button>
   </section>
 
-  <!-- Step 2 · Map -->
   <section class="card">
     <h2>Step 2 · Map</h2>
     <div id="map"></div>
   </section>
 
-  <!-- Step 3 · Downloads -->
   <section class="card">
     <h2>Step 3 · Downloads</h2>
     <ul id="downloads"></ul>
   </section>
 
-  <!-- Step 4 · Other stats -->
   <section class="card">
     <h2>Step 4 · Other statistics</h2>
     <pre id="other-stats">—</pre>
   </section>
 
-  <!-- Step 5 · Velocity summary -->
   <section id="step5" class="card" style="display:none">
     <h2>Step 5 · Velocity summary</h2>
     <p class="muted">Statistics computed on the full raster (valid cells only).</p>
@@ -100,11 +95,11 @@
     </details>
   </section>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const map = L.map("map").setView([40, -3], 5);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-    // utils
     function fmtNum(x, d=3) { return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
     function fmtInt(x) { return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
     function fmtPct(x, d=1) { return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d)+"%"; }
@@ -119,7 +114,6 @@
       const total = (stats.count ?? 0) + (stats.nodata_count ?? 0);
       const nodataPct = total > 0 ? (100 * (stats.nodata_count ?? 0) / total) : NaN;
 
-      // chips
       document.getElementById("vel-mean").textContent = fmtNum(stats.mean);
       document.getElementById("vel-min").textContent  = fmtNum(stats.min);
       document.getElementById("vel-max").textContent  = fmtNum(stats.max);
@@ -130,7 +124,6 @@
       document.getElementById("vel-ci").textContent = ciStr;
       document.getElementById("vel-n").textContent  = fmtInt(stats.count);
 
-      // details
       document.getElementById("vel-count").textContent     = fmtInt(stats.count);
       document.getElementById("vel-nodata").textContent    = fmtInt(stats.nodata_count);
       document.getElementById("vel-nodata-pct").textContent= fmtPct(nodataPct);
@@ -147,7 +140,6 @@
       document.getElementById("vel-ci-low").textContent    = fmtNum(stats.ci95_low);
       document.getElementById("vel-ci-high").textContent   = fmtNum(stats.ci95_high);
 
-      // export CSV
       document.getElementById("vel-export").onclick = () => {
         const rows = [
           ["metric","value"],
@@ -178,8 +170,10 @@
         URL.revokeObjectURL(a.href);
       };
 
-      // copy summary
       document.getElementById("vel-copy").onclick = async () => {
+        const ciStr2 = (stats.ci95_low!=null && stats.ci95_high!=null)
+          ? `${fmtNum(stats.ci95_low)} – ${fmtNum(stats.ci95_high)}`
+          : "—";
         const summary =
 `Velocity summary (full raster)
 N valid: ${fmtInt(stats.count)} | NoData: ${fmtInt(stats.nodata_count)} (${fmtPct(nodataPct)})
@@ -187,27 +181,25 @@ Mean: ${fmtNum(stats.mean)} ${units}
 Std: ${fmtNum(stats.std)} | SE: ${fmtNum(stats.se)}
 Min–Max: ${fmtNum(stats.min)} – ${fmtNum(stats.max)} ${units}
 p05/p25/p50/p75/p95: ${fmtNum(stats.p05)}, ${fmtNum(stats.p25)}, ${fmtNum(stats.p50)}, ${fmtNum(stats.p75)}, ${fmtNum(stats.p95)}
-95% CI (mean): ${ciStr} ${units}
+95% CI (mean): ${ciStr2} ${units}
 Range: ${fmtNum(stats.range)} | CV: ${fmtNum(stats.cv,1)}%`;
         try { await navigator.clipboard.writeText(summary); } catch {}
       };
     }
 
-    // process button
     document.getElementById("process").onclick = async () => {
       const f = document.getElementById("csvfile").files[0];
       if (!f) { alert("Select CSV first"); return; }
 
       const fd = new FormData();
       fd.append("csv_file", f);
-      fd.append("grid", 50);
-      fd.append("cell", 100);
-      fd.append("contour", 10);
+      fd.append("grid", 12000);
+      fd.append("cell", 1200);
+      fd.append("contour", 30);
 
       const r = await fetch("/run", { method:"POST", body:fd });
       const js = await r.json();
 
-      // downloads
       const ul = document.getElementById("downloads");
       ul.innerHTML = "";
       for (const [k,v] of Object.entries(js.urls)) {
@@ -218,10 +210,8 @@ Range: ${fmtNum(stats.range)} | CV: ${fmtNum(stats.cv,1)}%`;
         }
       }
 
-      // other stats quick view
       document.getElementById("other-stats").textContent = JSON.stringify(js.stats, null, 2);
 
-      // velocity summary
       renderVelocitySummary(js?.stats?.velocity, "m/s");
     };
   </script>

@@ -1,4 +1,4 @@
-# app/frontwave_os.py
+# frontwave.py
 # -*- coding: utf-8 -*-
 import os, math, warnings
 import numpy as np
@@ -13,7 +13,6 @@ from rasterio.warp import calculate_default_transform, reproject, Resampling
 from skimage import measure
 
 import os, sys
-# Detecta prefijo del entorno conda activo
 CONDA_PREFIX = os.environ.get("CONDA_PREFIX", sys.prefix)
 proj_dir = os.path.join(CONDA_PREFIX, "Library", "share", "proj")
 gdal_dir = os.path.join(CONDA_PREFIX, "Library", "share", "gdal")
@@ -23,14 +22,12 @@ os.environ.setdefault("PROJ_LIB", proj_dir)
 os.environ.setdefault("GDAL_DATA", gdal_dir)
 os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH","")
 
-# Fallback adicional con pyproj si existe
 try:
     from pyproj import datadir as _pdd
     os.environ.setdefault("PROJ_LIB", _pdd.get_data_dir())
 except Exception:
     pass
 
-# --- CRS helpers ---
 def guess_utm_epsg(lon, lat):
     zone = int((lon + 180) / 6) + 1
     south = lat < 0
@@ -40,8 +37,6 @@ def to_metric_crs(gdf):
     cx, cy = gdf.geometry.union_all().centroid.xy
     epsg = guess_utm_epsg(cx[0], cy[0])
     return gdf.to_crs(epsg), epsg
-
-# --- Read CSV ---
 
 def _pick_column(df, candidates, required=True):
     m = {c.lower().strip(): c for c in df.columns}
@@ -83,7 +78,6 @@ def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df[lon_field], df[lat_field]), crs="EPSG:4326")
     return gdf, {"date": date_field, "id": id_field, "weight": weight_field, "case": case_field}
 
-# --- Grid + select earliest ---
 def make_square_grid(bounds, cell_size):
     xmin, ymin, xmax, ymax = bounds
     cols = int(math.ceil((xmax - xmin) / cell_size))
@@ -106,7 +100,6 @@ def select_earliest_points_by_cell(points_m, cell_size):
     selected["NUM0"] = selected["MIN_N1"] - min_global
     return selected, grid
 
-# --- Kriging ---
 def run_ok_kriging(selected_m, value_field="NUM0", cell_size=1000.0, variogram_model="spherical"):
     xs = selected_m.geometry.x.values
     ys = selected_m.geometry.y.values
@@ -122,7 +115,6 @@ def run_ok_kriging(selected_m, value_field="NUM0", cell_size=1000.0, variogram_m
         zgrid, _ = OK.execute("grid", gridx, gridy)
     return gridx, gridy, np.asarray(zgrid)
 
-# --- Save + reproject rasters ---
 def save_geotiff_utm(path, gridx, gridy, z, epsg_code):
     z_rev = np.flipud(z)
     resx = gridx[1] - gridx[0] if len(gridx) > 1 else 1.0
@@ -153,7 +145,6 @@ def reproject_to_wgs84(src_path, dst_path):
             )
     return dst_path
 
-# --- Contours ---
 def contours_from_grid(gridx, gridy, z, interval):
     dx = gridx[1] - gridx[0]
     dy = gridy[1] - gridy[0]
@@ -171,7 +162,6 @@ def contours_from_grid(gridx, gridy, z, interval):
                 lines.append({"level": lev, "geometry": LineString(np.c_[xx, yy])})
     return gpd.GeoDataFrame(lines, geometry="geometry")
 
-# --- Slope + velocity ---
 def slope_degrees_from_grid(z, cell_size):
     dz_dy, dz_dx = np.gradient(z, cell_size, cell_size)
     slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
@@ -183,7 +173,6 @@ def velocity_from_slope(slope_deg):
     vel[mask] = 1.0 / slope_deg[mask]
     return vel
 
-# --- Deviational ellipse ---
 def standard_deviational_ellipse(points_m, weight_field=None, group_field=None):
     df = points_m.copy()
     df["_w"] = 1.0 if weight_field is None else df[weight_field].astype(float).fillna(0.0)
@@ -213,7 +202,6 @@ def standard_deviational_ellipse(points_m, weight_field=None, group_field=None):
     poly = ellipse_for_group(df)
     return gpd.GeoDataFrame([{"geometry": poly}], geometry="geometry", crs=df.crs) if poly else gpd.GeoDataFrame(geometry=[], crs=df.crs)
 
-# --- Pipeline ---
 def run_frontwave(csv_path, out_folder,
                   lon_field="lon", lat_field="lat", date_field="date", id_field="id",
                   weight_field="weight", case_field="cases",
@@ -231,7 +219,7 @@ def run_frontwave(csv_path, out_folder,
 
     gx, gy, z = run_ok_kriging(selected_m, value_field="NUM0", cell_size=krige_cell_m, variogram_model="spherical")
 
-    # rasters: guardar en UTM y reprojectar a WGS84
+    # Rasters: UTM + reproyección a WGS84
     kriging_utm = os.path.join(out_folder, "kriging_utm.tif")
     save_geotiff_utm(kriging_utm, gx, gy, z, epsg)
     kriging_tif = os.path.join(out_folder, "kriging.tif")

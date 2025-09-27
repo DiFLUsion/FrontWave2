@@ -1,15 +1,17 @@
-# app/main.py
+# main.py
 import os
 import math
+import uuid
 import numpy as np
 import rasterio
 from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from app.frontwave import run_frontwave # tu módulo que genera los resultados
- 
+from frontwave import run_frontwave  # módulo que genera los resultados
+
 app = FastAPI(title="FrontWave API")
 
 # CORS
@@ -20,19 +22,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Servir estáticos y salidas
+os.makedirs("static", exist_ok=True)
+os.makedirs("data", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/data", StaticFiles(directory="data"), name="data")
 
-# -------------------------------------------------------------------
-# Función para estadísticas del raster (full raster, excluyendo NoData)
-# -------------------------------------------------------------------
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
+
+
+# ---------------------------------------------
+# Estadísticos del raster (celdas válidas)
+# ---------------------------------------------
 def _raster_stats(path: str) -> dict:
-    """
-    Estadísticos del raster completo sobre celdas válidas (excluye NoData).
-    Devuelve: count, nodata_count, min, p05, p25, p50, p75, p95, max,
-              mean, std, se, ci95_low, ci95_high, range, cv
-    """
     with rasterio.open(path) as src:
-        band = src.read(1, masked=True)  # MaskedArray con NoData ya en mask
-    data = np.ma.compressed(band)        # solo válidos
+        band = src.read(1, masked=True)
+    data = np.ma.compressed(band)
 
     n_valid = int(data.size)
     n_total = int(band.size)
@@ -71,57 +78,68 @@ def _raster_stats(path: str) -> dict:
     }
 
 
-# -------------------------------------------------------------------
+# ---------------------------------------------
 # Endpoint principal
-# -------------------------------------------------------------------
+# ---------------------------------------------
 @app.post("/run")
 async def run_process(
     csv_file: UploadFile,
-    grid: int = Form(...),
-    cell: int = Form(...),
-    contour: int = Form(...),
+    grid: int = Form(...),      # tamaño de celda de selección temprana (m)
+    cell: int = Form(...),      # tamaño de celda del kriging (m)
+    contour: int = Form(...),   # intervalo de isolíneas
 ):
-    """
-    Lanza el proceso FrontWave y devuelve URLs y estadísticas.
-    """
     # Guardar CSV temporalmente
-    tmp_csv = os.path.join("tmp", csv_file.filename)
     os.makedirs("tmp", exist_ok=True)
+    tmp_csv = os.path.join("tmp", csv_file.filename)
     with open(tmp_csv, "wb") as f:
         f.write(await csv_file.read())
 
-    # Ejecutar proceso principal (frontwave.py)
-    res = run_frontwave(tmp_csv, grid=grid, cell=cell, contour=contour)
+    # Carpeta de salida única por ejecución
+    run_id = uuid.uuid4().hex[:8]
+    out_dir = os.path.join("data", run_id)
+    os.makedirs(out_dir, exist_ok=True)
 
-    # URLs a devolver
+    # Ejecutar proceso principal
+    res = run_frontwave(
+        csv_path=tmp_csv,
+        out_folder=out_dir,
+        grid_cell_m=float(grid),
+        krige_cell_m=float(cell),
+        contour_interval=float(contour),
+        sep=';',
+        dayfirst=True
+    )
+
+    # Convertir rutas locales a URLs servidas en /data
+    def to_url(p):
+        if not p:
+            return None
+        p = p.replace("\\", "/")
+        # asegúrate de que está bajo data/
+        rel = p.split("data/", 1)[-1] if "data/" in p else os.path.relpath(p, "data").replace("\\", "/")
+        return f"/data/{rel}"
+
     urls = {
-        "velocity": res.get("velocity_url"),
-        "kriging": res.get("kriging_url"),
-        "contour": res.get("contour_url"),
-        "slope": res.get("slope_url"),
+        "kriging": to_url(res.get("kriging")),
+        "slope": to_url(res.get("slope")),
+        "velocity": to_url(res.get("velocity")),
+        "contours": to_url(res.get("contours")),
+        "ellipse": to_url(res.get("ellipse")),
+        "selected_points": to_url(res.get("selected_points")),
+        "grid": to_url(res.get("grid")),
     }
 
     # Estadísticas
     stats = {}
-
-    # Velocity: usar la función nueva
     if res.get("velocity"):
         stats["velocity"] = _raster_stats(res["velocity"])
     else:
         stats["velocity"] = {"count": 0, "nodata_count": None}
 
-    # Mantén si quieres el min/max para otros
-    if res.get("kriging_minmax"):
-        stats["kriging"] = res["kriging_minmax"]
-    if res.get("slope_minmax"):
-        stats["slope"] = res["slope_minmax"]
-
-    payload = {"urls": urls, "stats": stats}
+    payload = {"run_id": run_id, "urls": urls, "stats": stats}
     return JSONResponse(content=payload)
 
 
-# -------------------------------------------------------------------
-# Main local
-# -------------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
