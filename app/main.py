@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import geopandas as gpd
 
+# paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
@@ -19,6 +20,7 @@ TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
+# import
 try:
     from .frontwave import run_frontwave
 except ImportError:
@@ -46,37 +48,39 @@ def root():
 def _raster_stats(path: str) -> dict:
     with rasterio.open(path) as src:
         band = src.read(1, masked=True)
-    data = np.ma.compressed(band)
+    data = np.ma.compressed(band).astype(np.float64)
     n_valid = int(data.size)
     n_total = int(band.size)
     n_nodata = int(n_total - n_valid)
     if n_valid == 0:
         return {"count": 0, "nodata_count": n_nodata, "min": None, "p05": None, "p25": None, "p50": None,
                 "p75": None, "p95": None, "max": None, "mean": None, "std": None, "se": None,
-                "ci95_low": None, "ci95_high": None, "range": None, "cv": None}
+                "ci95_low": None, "ci95_high": None, "range": None, "cv": None,
+                "hist_bins": [], "hist_counts": []}
     q = np.percentile(data, [5, 25, 50, 75, 95])
     vmin = float(np.min(data)); vmax = float(np.max(data)); mean = float(np.mean(data))
     std = float(np.std(data, ddof=1)) if n_valid > 1 else float("nan")
     se = (std / math.sqrt(n_valid)) if n_valid > 1 else float("nan")
+    counts, edges = np.histogram(data, bins=20)
     return {
         "count": n_valid, "nodata_count": n_nodata,
         "min": vmin, "p05": float(q[0]), "p25": float(q[1]), "p50": float(q[2]), "p75": float(q[3]), "p95": float(q[4]),
         "max": vmax, "mean": mean, "std": std, "se": se,
         "ci95_low": mean - 1.96 * se if n_valid > 1 else float("nan"),
         "ci95_high": mean + 1.96 * se if n_valid > 1 else float("nan"),
-        "range": vmax - vmin, "cv": (100.0 * std / mean) if n_valid > 1 and mean != 0 else float("nan")
+        "range": vmax - vmin, "cv": (100.0 * std / mean) if n_valid > 1 and mean != 0 else float("nan"),
+        "hist_bins": edges.tolist(), "hist_counts": counts.tolist()
     }
 
+# color rendering
 def _palette_stops(name: str):
     if name == "viridis":
-        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array([
-            [68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]
-        ], dtype=float)
+        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array(
+            [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]], dtype=float)
     if name == "heat":
-        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array([
-            [0, 0, 128], [0, 255, 255], [255, 255, 0], [255, 128, 0], [128, 0, 0]
-        ], dtype=float)
-    return np.array([0.0, 1.0]), np.array([[0, 0, 0], [255, 255, 255]], dtype=float)
+        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array(
+            [[0,0,128],[0,255,255],[255,255,0],[255,128,0],[128,0,0]], dtype=float)
+    return np.array([0.0,1.0]), np.array([[0,0,0],[255,255,255]], dtype=float)
 
 def _apply_palette_01(x01: np.ndarray, palette: str):
     x = np.clip(x01, 0.0, 1.0)
@@ -94,7 +98,7 @@ def _apply_palette_01(x01: np.ndarray, palette: str):
 def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, palette: str):
     with rasterio.open(src_tif) as src:
         arr = src.read(1, masked=True)
-        bounds = src.bounds
+        bounds = src.bounds  # (W,S,E,N)
     data = np.ma.filled(arr, np.nan).astype(np.float64)
     valid = np.isfinite(data)
     if valid.sum() == 0:
@@ -170,10 +174,13 @@ async def run_process(
         gdf.to_file(out_path, driver="GeoJSON")
         return to_url(out_path)
 
-    points_geojson   = export_geojson(res.get("selected_points"), "selected_pts", "selected_points.geojson")
-    ellipse_geojson  = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
-    contours_geojson = export_geojson(res.get("contours"), "contours", "contours.geojson")
+    # GeoJSON layers for Leaflet
+    all_points_geojson = export_geojson(res.get("all_points"), "all_pts", "all_points.geojson")
+    points_geojson     = export_geojson(res.get("selected_points"), "selected_pts", "selected_points.geojson")
+    ellipse_geojson    = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
+    contours_geojson   = export_geojson(res.get("contours"), "contours", "contours.geojson")
 
+    # PNG quicklooks for rasters
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
@@ -193,15 +200,16 @@ async def run_process(
         "contours": to_url(res.get("contours")),
         "ellipse": to_url(res.get("ellipse")),
         "selected_points": to_url(res.get("selected_points")),
+        "all_points": to_url(res.get("all_points")),
         "grid": to_url(res.get("grid")),
         "selected_points_geojson": points_geojson,
+        "all_points_geojson": all_points_geojson,
         "ellipse_geojson": ellipse_geojson,
         "contours_geojson": contours_geojson,
     }
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
 
-    # incluir nombre de la columna de fecha si llegó desde frontwave
     meta = {"date_field": res.get("date_field", "date")}
     return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats, "meta": meta})
 
