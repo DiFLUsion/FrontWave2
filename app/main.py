@@ -4,13 +4,13 @@ import math
 import uuid
 import numpy as np
 import rasterio
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, UploadFile, Form, Query
 from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+import geopandas as gpd
 
-# rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
@@ -19,7 +19,6 @@ TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
-# import robusto
 try:
     from .frontwave import run_frontwave
 except ImportError:
@@ -28,15 +27,8 @@ except ImportError:
         sys.path.append(BASE_DIR)
     from frontwave import run_frontwave
 
-# geopandas
-import geopandas as gpd  # requerido por frontwave.py
-
 app = FastAPI(title="FrontWave API")
-
-app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
-)
-
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
 
@@ -50,7 +42,6 @@ def root():
     if not os.path.exists(index_path):
         return PlainTextResponse(f"index.html not found at {index_path}", status_code=500)
     return FileResponse(index_path, media_type="text/html")
-
 
 def _raster_stats(path: str) -> dict:
     with rasterio.open(path) as src:
@@ -76,35 +67,58 @@ def _raster_stats(path: str) -> dict:
         "range": vmax - vmin, "cv": (100.0 * std / mean) if n_valid > 1 and mean != 0 else float("nan")
     }
 
-def _quicklook_png(src_tif: str, dst_png: str):
-    """PNG RGBA + bounds Leaflet [[S,W],[N,E]] desde GeoTIFF WGS84."""
+def _palette_stops(name: str):
+    if name == "viridis":
+        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array([
+            [68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]
+        ], dtype=float)
+    if name == "heat":
+        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array([
+            [0, 0, 128], [0, 255, 255], [255, 255, 0], [255, 128, 0], [128, 0, 0]
+        ], dtype=float)
+    return np.array([0.0, 1.0]), np.array([[0, 0, 0], [255, 255, 255]], dtype=float)
+
+def _apply_palette_01(x01: np.ndarray, palette: str):
+    x = np.clip(x01, 0.0, 1.0)
+    pos, col = _palette_stops(palette)
+    idx = np.searchsorted(pos, x, side="right") - 1
+    idx = np.clip(idx, 0, len(pos) - 2)
+    p0 = pos[idx]; p1 = pos[idx + 1]
+    a = (x - p0) / (p1 - p0 + 1e-12)
+    c0 = col[idx]; c1 = col[idx + 1]
+    r = ((1 - a) * c0[..., 0] + a * c1[..., 0]).astype(np.uint8)
+    g = ((1 - a) * c0[..., 1] + a * c1[..., 1]).astype(np.uint8)
+    b = ((1 - a) * c0[..., 2] + a * c1[..., 2]).astype(np.uint8)
+    return r, g, b
+
+def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, palette: str):
     with rasterio.open(src_tif) as src:
         arr = src.read(1, masked=True)
-        bounds = src.bounds  # (W,S,E,N)
+        bounds = src.bounds
     data = np.ma.filled(arr, np.nan).astype(np.float64)
     valid = np.isfinite(data)
-
     if valid.sum() == 0:
         h, w = data.shape
         rgba = np.zeros((4, h, w), dtype=np.uint8)
     else:
-        vmin = np.nanpercentile(data, 2)
-        vmax = np.nanpercentile(data, 98)
-        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-            vmin = np.nanmin(data); vmax = np.nanmax(data)
-            if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-                vmin, vmax = 0.0, 1.0
-        scaled = (data - vmin) / (vmax - vmin)
-        gray = np.clip(np.round(scaled * 255), 0, 255).astype(np.uint8)
+        lo = np.nanpercentile(data, pmin)
+        hi = np.nanpercentile(data, pmax)
+        if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+            lo = np.nanmin(data); hi = np.nanmax(data)
+            if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+                lo, hi = 0.0, 1.0
+        x01 = (data - lo) / (hi - lo)
+        r, g, b = _apply_palette_01(x01, palette)
         alpha = np.where(valid, 255, 0).astype(np.uint8)
-        rgba = np.stack([gray, gray, gray, alpha], axis=0)
-
+        rgba = np.stack([r, g, b, alpha], axis=0)
     h, w = rgba.shape[1], rgba.shape[2]
     profile = {"driver": "PNG", "height": h, "width": w, "count": 4, "dtype": "uint8"}
     with rasterio.open(dst_png, "w", **profile) as dst:
         dst.write(rgba)
-
     return [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
+
+def _quicklook_png(src_tif: str, dst_png: str):
+    return _render_png_from_tif(src_tif, dst_png, 2.0, 98.0, "gray")
 
 @app.post("/run")
 async def run_process(
@@ -140,7 +154,6 @@ async def run_process(
         sep=sep, dayfirst=True
     )
 
-    # GeoJSON en EPSG:4326 para mostrar en Leaflet
     def to_url(p):
         if not p: return None
         p = os.path.abspath(p).replace("\\", "/")
@@ -161,7 +174,6 @@ async def run_process(
     ellipse_geojson  = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
     contours_geojson = export_geojson(res.get("contours"), "contours", "contours.geojson")
 
-    # Quicklooks PNG para rasters (sin dependencias de cliente)
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
@@ -189,7 +201,28 @@ async def run_process(
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
 
-    return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats})
+    # incluir nombre de la columna de fecha si llegó desde frontwave
+    meta = {"date_field": res.get("date_field", "date")}
+    return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats, "meta": meta})
+
+@app.get("/render")
+def render_raster(
+    kind: str = Query(..., pattern="^(kriging|slope|velocity)$"),
+    run_id: str = Query(...),
+    pmin: float = Query(2.0, ge=0.0, le=100.0),
+    pmax: float = Query(98.0, ge=0.0, le=100.0),
+    palette: str = Query("gray"),
+):
+    tif_map = {"kriging": "kriging.tif", "slope": "slope.tif", "velocity": "velocity.tif"}
+    src_tif = os.path.join(DATA_DIR, run_id, tif_map[kind])
+    if not os.path.exists(src_tif):
+        return JSONResponse({"error": "raster not found"}, status_code=404)
+    if pmax <= pmin:
+        pmin, pmax = 2.0, 98.0
+    out_png = os.path.join(DATA_DIR, run_id, f"{kind}_{palette}_{int(pmin)}_{int(pmax)}.png")
+    bounds = _render_png_from_tif(src_tif, out_png, pmin, pmax, palette)
+    rel = os.path.relpath(out_png, DATA_DIR).replace("\\", "/")
+    return JSONResponse({"url": f"/data/{rel}?v={uuid.uuid4().hex[:6]}", "bounds": bounds})
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

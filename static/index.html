@@ -12,9 +12,9 @@
     section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
     .row { display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center }
     label { font-size:0.9rem }
-    select, input[type="number"] { padding:0.3rem }
+    select, input[type="number"], input[type="range"] { padding:0.3rem }
     .muted { color:#555; font-size:0.9em }
-    #map { height:480px; margin:1rem 0 }
+    #map { height:520px; margin:1rem 0 }
     .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd }
     table { border-collapse:collapse; width:100% }
     th, td { border:1px solid #ddd; padding:4px 6px; font-size:12px; white-space:nowrap }
@@ -24,6 +24,9 @@
     .legend { background:#fff; padding:.5rem; border:1px solid #ccc; border-radius:6px; line-height:1.1 }
     .legend canvas { display:block; width:160px; height:12px; image-rendering:pixelated; margin:.25rem 0 }
     .legend .ticks { display:flex; justify-content:space-between; font-size:.8rem }
+    .ts { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap }
+    .ts .grow { flex:1 1 260px }
+    .btn { padding:.4rem .7rem; border:1px solid #aaa; background:#f8f8f8; border-radius:6px; cursor:pointer }
   </style>
 </head>
 <body>
@@ -67,6 +70,7 @@
 
   <section class="card">
     <h2>Paso 2 · Mapa</h2>
+
     <div class="row" style="align-items:flex-end">
       <label>Capa raster:
         <select id="raster_layer">
@@ -88,8 +92,19 @@
       <label>p<sub>max</sub>:
         <input type="number" id="pmax" value="98" min="50" max="100" step="1" style="width:4.5rem">
       </label>
-      <button id="apply-style">Aplicar simbología</button>
+      <button id="apply-style" class="btn">Aplicar simbología</button>
     </div>
+
+    <div class="ts" style="margin:.5rem 0 0">
+      <strong>Tiempo:</strong>
+      <button id="play" class="btn">Play</button>
+      <button id="pause" class="btn">Pause</button>
+      <div class="grow">
+        <input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%">
+      </div>
+      <div><span id="time-start">—</span> → <strong id="time-current">—</strong></div>
+    </div>
+
     <div id="map"></div>
   </section>
 
@@ -115,7 +130,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    // mapa y panes para asegurar orden (vectores encima)
+    // mapa y panes
     const map = L.map("map").setView([40, -3], 5);
     map.createPane("rasters");  map.getPane("rasters").style.zIndex = 300;
     map.createPane("vectors");  map.getPane("vectors").style.zIndex = 650;
@@ -123,10 +138,18 @@
 
     const overlays = {};
     const layerControl = L.control.layers(null, overlays).addTo(map);
-    const rasterOverlays = {};   // {name: L.ImageOverlay}
-    const rasterBounds = {};     // {name: [[S,W],[N,E]]}
+    const rasterOverlays = {};
+    const rasterBounds = {};
     let vectorLayers = [];
     let currentRun = null;
+
+    // grupo persistente para puntos con time slider
+    const pointsGroup = L.layerGroup([], {pane:"vectors"}).addTo(map);
+    overlays["selected points"] = pointsGroup; layerControl.addOverlay(pointsGroup, "selected points");
+    let pointsAll = [];        // array de features GeoJSON
+    let timeDates = [];        // fechas únicas ordenadas (ISO)
+    let timeIndexOf = {};      // mapa ISO -> idx
+    let timeTimer = null;
 
     // leyenda
     const legend = L.control({position:"bottomright"});
@@ -141,18 +164,16 @@
     legend.addTo(map);
 
     function drawLegend(palette, vmin, vmax){
-      const c = document.getElementById("leg-canvas");
+      const c = document.getElementById("leg-canvas"); if(!c) return;
       const ctx = c.getContext("2d");
       const grd = ctx.createLinearGradient(0, 0, c.width, 0);
       if (palette === "viridis"){
-        [[0,[68,1,84]], [0.25,[59,82,139]], [0.5,[33,145,140]], [0.75,[94,201,98]], [1,[253,231,37]]]
+        [[0,[68,1,84]],[0.25,[59,82,139]],[0.5,[33,145,140]],[0.75,[94,201,98]],[1,[253,231,37]]]
           .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
       } else if (palette === "heat"){
         [[0,[0,0,128]],[0.25,[0,255,255]],[0.5,[255,255,0]],[0.75,[255,128,0]],[1,[128,0,0]]]
           .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
-      } else {
-        grd.addColorStop(0,"#000"); grd.addColorStop(1,"#fff");
-      }
+      } else { grd.addColorStop(0,"#000"); grd.addColorStop(1,"#fff"); }
       ctx.fillStyle = grd; ctx.fillRect(0,0,c.width,c.height);
       document.getElementById("leg-min").textContent = `pmin ${vmin}`;
       document.getElementById("leg-max").textContent = `pmax ${vmax}`;
@@ -183,6 +204,9 @@
     function clearVectors(){
       vectorLayers.forEach(l=>{ try{ layerControl.removeLayer(l); map.removeLayer(l);}catch{} });
       vectorLayers = [];
+      pointsGroup.clearLayers();
+      pointsAll = [];
+      timeDates = []; timeIndexOf = {};
     }
 
     function addImage(name, url, bounds){
@@ -197,6 +221,35 @@
 
     async function addGeoJSON(name, url, kind){
       const gj = await fetch(url).then(r=>r.json());
+      if (kind === "points"){
+        // construir índice temporal
+        pointsAll = Array.isArray(gj.features) ? gj.features : [];
+        // detecta campo fecha
+        const sample = pointsAll.find(f=>f && f.properties);
+        const dateKey = sample && ("DATE_ISO" in sample.properties ? "DATE_ISO" :
+                                   ("date" in sample.properties ? "date" : null));
+        const dates = pointsAll
+          .map(f => (dateKey ? String(f.properties[dateKey]) : null))
+          .filter(s => s && !isNaN(new Date(s)))
+          .map(s => s.slice(0,10)); // YYYY-MM-DD
+        const uq = Array.from(new Set(dates)).sort();
+        timeDates = uq;
+        timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
+        const slider = document.getElementById("time");
+        const tstart = document.getElementById("time-start");
+        const tcur = document.getElementById("time-current");
+        if (uq.length){
+          slider.min = 0; slider.max = uq.length - 1; slider.value = uq.length - 1; slider.disabled = false;
+          tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
+          renderPointsAt(parseInt(slider.value), dateKey);
+        } else {
+          slider.min = 0; slider.max = 0; slider.value = 0; slider.disabled = true;
+          tstart.textContent = "—"; tcur.textContent = "—";
+          pointsGroup.clearLayers();
+        }
+        return;
+      }
+      // otros vectores
       const opts = {
         pane: "vectors",
         style: (f) => {
@@ -212,6 +265,49 @@
       try{ map.fitBounds(layer.getBounds()); }catch{}
     }
 
+    function renderPointsAt(idx, dateKeyGuess){
+      const slider = document.getElementById("time");
+      if (typeof idx !== "number") idx = parseInt(slider.value);
+      const tcur = document.getElementById("time-current");
+      if (!timeDates.length){ tcur.textContent = "—"; pointsGroup.clearLayers(); return; }
+      const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
+      tcur.textContent = cutoff;
+      pointsGroup.clearLayers();
+      const dateKey = dateKeyGuess || (pointsAll[0]?.properties?.DATE_ISO ? "DATE_ISO" : "date");
+      const layer = L.geoJSON({
+        type:"FeatureCollection",
+        features: pointsAll.filter(f=>{
+          const s = f.properties?.[dateKey]; if (!s) return false;
+          const d = String(s).slice(0,10);
+          const i = timeIndexOf[d]; return typeof i === "number" && i <= idx;
+        })
+      }, {
+        pane: "vectors",
+        pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
+      });
+      layer.addTo(pointsGroup);
+      try{ map.fitBounds(pointsGroup.getBounds()); }catch{}
+    }
+
+    // eventos timeslider
+    document.getElementById("time").addEventListener("input", e => {
+      renderPointsAt(parseInt(e.target.value));
+    });
+    document.getElementById("play").addEventListener("click", () => {
+      if (timeTimer) return;
+      const slider = document.getElementById("time");
+      let i = parseInt(slider.value);
+      timeTimer = setInterval(()=>{
+        if (!timeDates.length){ clearInterval(timeTimer); timeTimer=null; return; }
+        i = (i + 1 <= parseInt(slider.max)) ? i + 1 : 0;
+        slider.value = i;
+        renderPointsAt(i);
+      }, 600);
+    });
+    document.getElementById("pause").addEventListener("click", () => {
+      if (timeTimer){ clearInterval(timeTimer); timeTimer = null; }
+    });
+
     // preview CSV
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
@@ -219,7 +315,6 @@
       const idx = headers.findIndex(h => h.toLowerCase() === preferred);
       if(idx>=0) select.selectedIndex = idx;
     }
-
     function renderPreviewTable(headers, rows){
       const tbl = document.getElementById("preview-table");
       tbl.innerHTML = "";
@@ -236,11 +331,7 @@
       tbl.appendChild(thead); tbl.appendChild(tbody);
       document.getElementById("preview-wrap").style.display="";
     }
-
-    function currentSep(){
-      const v = document.getElementById("sep").value;
-      return v === "\\t" ? "\t" : v;
-    }
+    function currentSep(){ const v = document.getElementById("sep").value; return v === "\\t" ? "\t" : v; }
 
     document.getElementById("preview").onclick = async () => {
       const f = document.getElementById("csvfile").files[0];
@@ -266,6 +357,21 @@
           info.appendChild(chip(`Separador: ${sep === "\t" ? "tab" : sep}`));
         }
       });
+    };
+
+    document.getElementById("apply-style").onclick = async () => {
+      const kind = document.getElementById("raster_layer").value;
+      const pal  = document.getElementById("palette").value;
+      const pmin = Number(document.getElementById("pmin").value);
+      const pmax = Number(document.getElementById("pmax").value);
+      if (!currentRun || !rasterOverlays[kind]) { alert("Ejecuta el proceso y asegúrate de que la capa existe."); return; }
+      const url = `/render?run_id=${encodeURIComponent(currentRun)}&kind=${encodeURIComponent(kind)}&palette=${encodeURIComponent(pal)}&pmin=${pmin}&pmax=${pmax}`;
+      const resp = await fetch(url);
+      const js = await resp.json();
+      if (js.url){
+        rasterOverlays[kind].setUrl(js.url);
+        drawLegend(pal, pmin, pmax);
+      }
     };
 
     document.getElementById("process").onclick = async () => {
@@ -313,21 +419,6 @@
       drawLegend(document.getElementById("palette").value,
                  document.getElementById("pmin").value,
                  document.getElementById("pmax").value);
-    };
-
-    document.getElementById("apply-style").onclick = async () => {
-      const kind = document.getElementById("raster_layer").value;
-      const pal  = document.getElementById("palette").value;
-      const pmin = Number(document.getElementById("pmin").value);
-      const pmax = Number(document.getElementById("pmax").value);
-      if (!currentRun || !rasterOverlays[kind]) { alert("Ejecuta el proceso y asegúrate de que la capa existe."); return; }
-      const url = `/render?run_id=${encodeURIComponent(currentRun)}&kind=${encodeURIComponent(kind)}&palette=${encodeURIComponent(pal)}&pmin=${pmin}&pmax=${pmax}`;
-      const resp = await fetch(url);
-      const js = await resp.json();
-      if (js.url){
-        rasterOverlays[kind].setUrl(js.url);
-        drawLegend(pal, pmin, pmax);
-      }
     };
   </script>
 </body>
