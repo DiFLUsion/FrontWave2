@@ -5,12 +5,21 @@ import uuid
 import numpy as np
 import rasterio
 from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from frontwave import run_frontwave  # módulo que genera los resultados
+from frontwave import run_frontwave
+
+# --- rutas absolutas seguras ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+TMP_DIR = os.path.join(BASE_DIR, "tmp")
+os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(TMP_DIR, exist_ok=True)
 
 app = FastAPI(title="FrontWave API")
 
@@ -22,15 +31,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Servir estáticos y salidas
-os.makedirs("static", exist_ok=True)
-os.makedirs("data", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/data", StaticFiles(directory="data"), name="data")
+# Archivos estáticos
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
+
+@app.get("/healthz")
+def healthz():
+    return PlainTextResponse("ok")
 
 @app.get("/")
-async def root():
-    return FileResponse("static/index.html")
+def root():
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if not os.path.exists(index_path):
+        return PlainTextResponse("index.html not found in /static", status_code=500)
+    return FileResponse(index_path, media_type="text/html")
 
 
 # ---------------------------------------------
@@ -84,19 +98,18 @@ def _raster_stats(path: str) -> dict:
 @app.post("/run")
 async def run_process(
     csv_file: UploadFile,
-    grid: int = Form(...),      # tamaño de celda de selección temprana (m)
-    cell: int = Form(...),      # tamaño de celda del kriging (m)
-    contour: int = Form(...),   # intervalo de isolíneas
+    grid: int = Form(...),
+    cell: int = Form(...),
+    contour: int = Form(...),
 ):
     # Guardar CSV temporalmente
-    os.makedirs("tmp", exist_ok=True)
-    tmp_csv = os.path.join("tmp", csv_file.filename)
+    tmp_csv = os.path.join(TMP_DIR, csv_file.filename)
     with open(tmp_csv, "wb") as f:
         f.write(await csv_file.read())
 
     # Carpeta de salida única por ejecución
     run_id = uuid.uuid4().hex[:8]
-    out_dir = os.path.join("data", run_id)
+    out_dir = os.path.join(DATA_DIR, run_id)
     os.makedirs(out_dir, exist_ok=True)
 
     # Ejecutar proceso principal
@@ -114,9 +127,8 @@ async def run_process(
     def to_url(p):
         if not p:
             return None
-        p = p.replace("\\", "/")
-        # asegúrate de que está bajo data/
-        rel = p.split("data/", 1)[-1] if "data/" in p else os.path.relpath(p, "data").replace("\\", "/")
+        p = os.path.abspath(p).replace("\\", "/")
+        rel = os.path.relpath(p, DATA_DIR).replace("\\", "/")
         return f"/data/{rel}"
 
     urls = {
@@ -142,4 +154,4 @@ async def run_process(
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
