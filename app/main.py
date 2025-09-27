@@ -1,4 +1,4 @@
-# main.py (cabecera)
+# main.py
 import os
 import math
 import uuid
@@ -10,28 +10,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-# --- rutas absolutas seguras ---
+# -------------------------------------------------
+# Rutas absolutas para despliegue en Railway
+# -------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))      # un nivel arriba de /app
+STATIC_DIR = os.path.join(ROOT_DIR, "static")                # static es hermana de app
 DATA_DIR = os.path.join(BASE_DIR, "data")
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
-os.makedirs(STATIC_DIR, exist_ok=True)
+
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
-# --- import robusto de frontwave ---
+# -------------------------------------------------
+# Import robusto de frontwave
+# -------------------------------------------------
 try:
-    # si se ejecuta como paquete: uvicorn app.main:app
-    from .frontwave import run_frontwave  # type: ignore
-except Exception:
-    # si se ejecuta como script: uvicorn main:app
+    from .frontwave import run_frontwave  # si se ejecuta como paquete (uvicorn app.main:app)
+except ImportError:
     import sys
     if BASE_DIR not in sys.path:
         sys.path.append(BASE_DIR)
-    from frontwave import run_frontwave  # type: ignore
-
-
-
+    from frontwave import run_frontwave  # si se ejecuta como script (uvicorn main:app)
 
 app = FastAPI(title="FrontWave API")
 
@@ -43,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Archivos estáticos
+# Montar directorios estáticos
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
 
@@ -55,13 +55,15 @@ def healthz():
 def root():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if not os.path.exists(index_path):
-        return PlainTextResponse("index.html not found in /static", status_code=500)
+        return PlainTextResponse(
+            f"index.html not found at {index_path}", status_code=500
+        )
     return FileResponse(index_path, media_type="text/html")
 
 
-# ---------------------------------------------
-# Estadísticos del raster (celdas válidas)
-# ---------------------------------------------
+# -------------------------------------------------
+# Estadísticos de un raster
+# -------------------------------------------------
 def _raster_stats(path: str) -> dict:
     with rasterio.open(path) as src:
         band = src.read(1, masked=True)
@@ -104,9 +106,9 @@ def _raster_stats(path: str) -> dict:
     }
 
 
-# ---------------------------------------------
-# Endpoint principal
-# ---------------------------------------------
+# -------------------------------------------------
+# Endpoint principal de proceso
+# -------------------------------------------------
 @app.post("/run")
 async def run_process(
     csv_file: UploadFile,
@@ -114,17 +116,15 @@ async def run_process(
     cell: int = Form(...),
     contour: int = Form(...),
 ):
-    # Guardar CSV temporalmente
+    # guardar CSV temporal
     tmp_csv = os.path.join(TMP_DIR, csv_file.filename)
     with open(tmp_csv, "wb") as f:
         f.write(await csv_file.read())
 
-    # Carpeta de salida única por ejecución
     run_id = uuid.uuid4().hex[:8]
     out_dir = os.path.join(DATA_DIR, run_id)
     os.makedirs(out_dir, exist_ok=True)
 
-    # Ejecutar proceso principal
     res = run_frontwave(
         csv_path=tmp_csv,
         out_folder=out_dir,
@@ -135,7 +135,6 @@ async def run_process(
         dayfirst=True
     )
 
-    # Convertir rutas locales a URLs servidas en /data
     def to_url(p):
         if not p:
             return None
@@ -153,17 +152,17 @@ async def run_process(
         "grid": to_url(res.get("grid")),
     }
 
-    # Estadísticas
     stats = {}
     if res.get("velocity"):
         stats["velocity"] = _raster_stats(res["velocity"])
     else:
         stats["velocity"] = {"count": 0, "nodata_count": None}
 
-    payload = {"run_id": run_id, "urls": urls, "stats": stats}
-    return JSONResponse(content=payload)
+    return JSONResponse(content={"run_id": run_id, "urls": urls, "stats": stats})
 
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    # si ejecutas como paquete (uvicorn app.main:app) no hace falta este __main__,
+    # pero no afecta si lo dejas
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
