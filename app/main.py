@@ -10,16 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-# rutas base
+# rutas
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))   # repo/
-STATIC_DIR = os.path.join(ROOT_DIR, "static")              # repo/static
-DATA_DIR = os.path.join(BASE_DIR, "data")                  # repo/app/data
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
+STATIC_DIR = os.path.join(ROOT_DIR, "static")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
-# import robusto de frontwave
+# import robusto
 try:
     from .frontwave import run_frontwave
 except ImportError:
@@ -28,7 +28,7 @@ except ImportError:
         sys.path.append(BASE_DIR)
     from frontwave import run_frontwave
 
-# geopandas opcional para exportar GeoJSON de puntos
+# geopandas opcional
 try:
     import geopandas as gpd
 except Exception:
@@ -79,6 +79,29 @@ def _raster_stats(path: str) -> dict:
         "range": vmax - vmin, "cv": (100.0 * std / mean) if n_valid > 1 and mean != 0 else float("nan")
     }
 
+def _quicklook_png(src_tif: str, dst_png: str):
+    """Genera PNG RGBA y devuelve bounds [[s,w],[n,e]] en EPSG:4326."""
+    with rasterio.open(src_tif) as src:
+        arr = src.read(1, masked=True)
+        bounds = src.bounds  # left, bottom, right, top (w, s, e, n)
+    data = np.array(arr, dtype=np.float64)
+    mask = ~np.isfinite(data)
+    if np.all(mask):
+        gray = np.zeros_like(data, dtype=np.uint8)
+    else:
+        vmin = np.nanmin(data[~mask]); vmax = np.nanmax(data[~mask])
+        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
+            gray = np.full_like(data, 127, dtype=np.uint8)
+        else:
+            scaled = (data - vmin) / (vmax - vmin)
+            gray = np.clip(np.round(scaled * 255), 0, 255).astype(np.uint8)
+    alpha = np.where(mask, 0, 255).astype(np.uint8)
+    rgba = np.stack([gray, gray, gray, alpha], axis=0)  # (4, H, W)
+    h, w = gray.shape
+    profile = {"driver": "PNG", "height": h, "width": w, "count": 4, "dtype": "uint8"}
+    with rasterio.open(dst_png, "w", **profile) as dst:
+        dst.write(rgba)
+    return [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
 
 @app.post("/run")
 async def run_process(
@@ -94,11 +117,8 @@ async def run_process(
     weight_field: str = Form("weight"),
     case_field: str = Form("cases"),
 ):
-    # normalizar separador (strings especiales desde el front)
-    if sep.lower() in ("\\t", "tab", "tabs"):
-        sep = "\t"
+    if sep.lower() in ("\\t", "tab", "tabs"): sep = "\t"
 
-    # guardar CSV
     tmp_csv = os.path.join(TMP_DIR, csv_file.filename)
     with open(tmp_csv, "wb") as f:
         f.write(await csv_file.read())
@@ -107,7 +127,6 @@ async def run_process(
     out_dir = os.path.join(DATA_DIR, run_id)
     os.makedirs(out_dir, exist_ok=True)
 
-    # ejecutar pipeline
     res = run_frontwave(
         csv_path=tmp_csv,
         out_folder=out_dir,
@@ -117,7 +136,7 @@ async def run_process(
         sep=sep, dayfirst=True
     )
 
-    # exportar puntos seleccionados a GeoJSON (si posible)
+    # GeoJSON puntos
     selected_geojson = None
     try:
         if gpd and res.get("selected_points") and os.path.exists(res["selected_points"]):
@@ -126,6 +145,19 @@ async def run_process(
             gdf.to_file(selected_geojson, driver="GeoJSON")
     except Exception:
         selected_geojson = None
+
+    # Quicklooks PNG + bounds para Leaflet (sin libs extra)
+    images = {}
+    def add_img(key, tif_path):
+        if not tif_path or not os.path.exists(tif_path): return
+        png_path = os.path.join(out_dir, f"{key}.png")
+        bounds = _quicklook_png(tif_path, png_path)
+        rel = os.path.relpath(png_path, DATA_DIR).replace("\\", "/")
+        images[key] = {"url": f"/data/{rel}", "bounds": bounds}
+
+    add_img("kriging", res.get("kriging"))
+    add_img("slope",   res.get("slope"))
+    add_img("velocity",res.get("velocity"))
 
     def to_url(p):
         if not p: return None
@@ -146,7 +178,7 @@ async def run_process(
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
 
-    return JSONResponse(content={"run_id": run_id, "urls": urls, "stats": stats})
+    return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats})
 
 
 if __name__ == "__main__":

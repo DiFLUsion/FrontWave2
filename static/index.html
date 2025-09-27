@@ -12,7 +12,7 @@
     section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
     .row { display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center }
     label { font-size:0.9rem }
-    select, input[type="text"], input[type="number"] { padding:0.3rem }
+    select, input[type="number"] { padding:0.3rem }
     .muted { color:#555; font-size:0.9em }
     #map { height:420px; margin:1rem 0 }
     .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd }
@@ -86,22 +86,10 @@
   </section>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Librerías locales para evitar MIME nosniff -->
-  <script src="/static/libs/geotiff.min.js"></script>
-  <script src="/static/libs/georaster.min.js"></script>
-  <script src="/static/libs/georaster-layer-for-leaflet.min.js"></script>
-
-  <!-- PapaParse local o CDN (MIME correcto en jsDelivr suele ir bien; si prefieres, ponlo en /static/libs también) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    // Verificación de dependencias
-    if (typeof parseGeoraster === "undefined") {
-      alert("Error cargando georaster*. Usa los .js locales en /static/libs.");
-    }
-
-    // --- mapa ---
+    // mapa
     const map = L.map("map").setView([40, -3], 5);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
     const overlays = {};
@@ -128,28 +116,13 @@
     function clearRasters(){ rasterLayers.forEach(l=>{try{layerControl.removeLayer(l); map.removeLayer(l);}catch{}}); rasterLayers=[]; }
     function clearVectors(){ vectorLayers.forEach(l=>{try{layerControl.removeLayer(l); map.removeLayer(l);}catch{}}); vectorLayers=[]; }
 
-    async function addRaster(name, url){
-      try{
-        const ab = await fetch(url).then(r=>r.arrayBuffer());
-        const georaster = await parseGeoraster(ab);
-        const stats = georaster.statistics?.[0] || {};
-        const min = Number.isFinite(stats.min) ? stats.min : (georaster.mins?.[0] ?? 0);
-        const max = Number.isFinite(stats.max) ? stats.max : (georaster.maxs?.[0] ?? 1);
-        const layer = new GeoRasterLayer({
-          georaster, opacity:0.75, resolution:256,
-          pixelValuesToColorFn: values => {
-            const v = values[0]; if (v==null || Number.isNaN(v)) return null;
-            const t = (max-min) ? Math.min(1, Math.max(0, (v-min)/(max-min))) : 0.5;
-            const g = Math.round(255*t); return `rgb(${g},${g},${g})`;
-          }
-        }).addTo(map);
-        rasterLayers.push(layer);
-        overlays[name]=layer; layerControl.addOverlay(layer, name);
-        try{ map.fitBounds(layer.getBounds()); }catch{}
-      }catch(e){
-        console.error("addRaster error", name, e);
-        alert(`No se pudo cargar el raster ${name}.`);
-      }
+    function addImage(name, url, bounds){
+      const layer = L.imageOverlay(url, bounds, {opacity:0.75});
+      layer.addTo(map);
+      rasterLayers.push(layer);
+      overlays[name] = layer;
+      layerControl.addOverlay(layer, name);
+      try { map.fitBounds(layer.getBounds()); } catch {}
     }
 
     async function addPoints(name, url){
@@ -161,12 +134,10 @@
         vectorLayers.push(layer);
         overlays[name]=layer; layerControl.addOverlay(layer, name);
         try{ map.fitBounds(layer.getBounds()); }catch{}
-      }catch(e){
-        console.error("addPoints error", name, e);
-      }
+      }catch(e){ console.error("addPoints", e); }
     }
 
-    // --- preview CSV ---
+    // preview CSV
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
       headers.forEach(h=>{
@@ -257,11 +228,13 @@
       }
 
       renderVelocitySummary(js?.stats?.velocity);
+
+      // capas (sin libs externas): PNG + bounds
       clearRasters(); clearVectors();
-      if (js.urls.kriging)  await addRaster("kriging",  js.urls.kriging);
-      if (js.urls.slope)    await addRaster("slope",    js.urls.slope);
-      if (js.urls.velocity) await addRaster("velocity", js.urls.velocity);
-      if (js.urls.selected_points_geojson) await addPoints("selected points", js.urls.selected_points_geojson);
+      if (js.images?.kriging)  addImage("kriging",  js.images.kriging.url,  js.images.kriging.bounds);
+      if (js.images?.slope)    addImage("slope",    js.images.slope.url,    js.images.slope.bounds);
+      if (js.images?.velocity) addImage("velocity", js.images.velocity.url, js.images.velocity.bounds);
+      if (js.urls.selected_points_geojson) addPoints("selected points", js.urls.selected_points_geojson);
     };
   </script>
 </body>
