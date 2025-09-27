@@ -1,4 +1,4 @@
-# main.py
+# app/main.py
 import os
 import math
 import uuid
@@ -10,16 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-# rutas
+# rutas base
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
-STATIC_DIR = os.path.join(ROOT_DIR, "static")
-DATA_DIR = os.path.join(BASE_DIR, "data")
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))   # repo/
+STATIC_DIR = os.path.join(ROOT_DIR, "static")              # repo/static
+DATA_DIR = os.path.join(BASE_DIR, "data")                  # repo/app/data
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
-# import robusto
+# import robusto de frontwave
 try:
     from .frontwave import run_frontwave
 except ImportError:
@@ -28,7 +28,7 @@ except ImportError:
         sys.path.append(BASE_DIR)
     from frontwave import run_frontwave
 
-# opcional: para exportar GeoJSON
+# geopandas opcional para exportar GeoJSON de puntos
 try:
     import geopandas as gpd
 except Exception:
@@ -54,6 +54,7 @@ def root():
         return PlainTextResponse(f"index.html not found at {index_path}", status_code=500)
     return FileResponse(index_path, media_type="text/html")
 
+
 def _raster_stats(path: str) -> dict:
     with rasterio.open(path) as src:
         band = src.read(1, masked=True)
@@ -78,13 +79,26 @@ def _raster_stats(path: str) -> dict:
         "range": vmax - vmin, "cv": (100.0 * std / mean) if n_valid > 1 and mean != 0 else float("nan")
     }
 
+
 @app.post("/run")
 async def run_process(
     csv_file: UploadFile,
-    grid: int = Form(...),
-    cell: int = Form(...),
-    contour: int = Form(...),
+    grid: float = Form(...),
+    cell: float = Form(...),
+    contour: float = Form(...),
+    sep: str = Form(";"),
+    lon_field: str = Form("lon"),
+    lat_field: str = Form("lat"),
+    date_field: str = Form("date"),
+    id_field: str = Form("id"),
+    weight_field: str = Form("weight"),
+    case_field: str = Form("cases"),
 ):
+    # normalizar separador (strings especiales desde el front)
+    if sep.lower() in ("\\t", "tab", "tabs"):
+        sep = "\t"
+
+    # guardar CSV
     tmp_csv = os.path.join(TMP_DIR, csv_file.filename)
     with open(tmp_csv, "wb") as f:
         f.write(await csv_file.read())
@@ -93,13 +107,17 @@ async def run_process(
     out_dir = os.path.join(DATA_DIR, run_id)
     os.makedirs(out_dir, exist_ok=True)
 
+    # ejecutar pipeline
     res = run_frontwave(
-        csv_path=tmp_csv, out_folder=out_dir,
+        csv_path=tmp_csv,
+        out_folder=out_dir,
+        lon_field=lon_field, lat_field=lat_field, date_field=date_field,
+        id_field=id_field, weight_field=weight_field, case_field=case_field,
         grid_cell_m=float(grid), krige_cell_m=float(cell), contour_interval=float(contour),
-        sep=';', dayfirst=True
+        sep=sep, dayfirst=True
     )
 
-    # Exportar puntos seleccionados a GeoJSON para el visor
+    # exportar puntos seleccionados a GeoJSON (si posible)
     selected_geojson = None
     try:
         if gpd and res.get("selected_points") and os.path.exists(res["selected_points"]):
@@ -129,6 +147,7 @@ async def run_process(
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
 
     return JSONResponse(content={"run_id": run_id, "urls": urls, "stats": stats})
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
