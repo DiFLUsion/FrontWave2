@@ -1,4 +1,4 @@
-<!-- static/index.html -->
+<!-- static/index.html (updated) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,7 +31,7 @@
     .btn-primary { background:var(--primary); color:var(--primary-ink); border-color:var(--primary) }
     .panel { display:flex; gap:1rem; align-items:center; flex-wrap:wrap }
     .vbox { display:flex; gap:.4rem; align-items:center }
-    #vel-chart { width:260px; height:70px; border:1px solid #ddd; border-radius:4px; background:#fff }
+    #vel-chart-wrap { width:420px; max-width:100%; background:#fff; border:1px solid #ddd; border-radius:8px; padding:.5rem }
   </style>
 </head>
 <body>
@@ -109,6 +109,7 @@
         <input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%">
       </div>
       <div><span id="time-start">—</span> → <strong id="time-current">—</strong></div>
+      <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
     </div>
 
     <div id="map"></div>
@@ -129,12 +130,15 @@
       <div class="vbox"><div class="chip">max: <span id="vel-max">—</span></div></div>
       <div class="vbox"><div class="chip">std: <span id="vel-std">—</span></div></div>
       <div class="vbox"><div class="chip">95% CI: <span id="vel-ci">—</span></div></div>
-      <canvas id="vel-chart"></canvas>
+    </div>
+    <div id="vel-chart-wrap">
+      <canvas id="velChart"></canvas>
     </div>
   </section>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <script>
     // map and panes
@@ -150,13 +154,14 @@
     let vectorLayers = [];
     let currentRun = null;
 
-    // persistent group for CSV points with time slider
+    // CSV points + time slider
     const pointsGroup = L.layerGroup([], {pane:"vectors"}).addTo(map);
     overlays["CSV points"] = pointsGroup; layerControl.addOverlay(pointsGroup, "CSV points");
-    let pointsAll = [];        // all features from CSV
-    let timeDates = [];        // unique sorted dates (ISO)
-    let timeIndexOf = {};      // ISO -> idx
+    let pointsAll = [];
+    let timeDates = [];
+    let timeIndexOf = {};
     let timeTimer = null;
+    let dateKeyGlobal = null;
 
     // legend
     const legend = L.control({position:"bottomright"});
@@ -186,26 +191,10 @@
       document.getElementById("leg-max").textContent = `pmax ${vmax}`;
     }
 
-    // velocity summary
+    // velocity summary + interactive histogram (Chart.js)
+    let velChart = null;
     function fmt(x, d=3){ return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
     function fmi(x){ return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
-
-    function drawVelocityChart(bins, counts){
-      const canvas = document.getElementById("vel-chart"); if(!canvas) return;
-      const ctx = canvas.getContext("2d");
-      const w = canvas.width, h = canvas.height;
-      ctx.clearRect(0,0,w,h);
-      if (!bins || !counts || !counts.length) { ctx.fillStyle="#999"; ctx.fillText("no data", 8, 16); return; }
-      const maxc = Math.max(...counts);
-      const barW = Math.max(1, Math.floor((w-10) / counts.length));
-      ctx.fillStyle = "#0b5fff";
-      for (let i=0;i<counts.length;i++){
-        const x = 5 + i*barW;
-        const bh = Math.round(((counts[i]||0)/maxc) * (h-10));
-        ctx.fillRect(x, h-5-bh, barW-2, bh);
-      }
-      ctx.strokeStyle="#ccc"; ctx.strokeRect(0.5,0.5,w-1,h-1);
-    }
 
     function renderVelocitySummary(stats){
       const card = document.getElementById("stats-card");
@@ -219,7 +208,46 @@
       document.getElementById("vel-std").textContent = fmt(stats.std);
       const ci = (stats.ci95_low!=null && stats.ci95_high!=null) ? `${fmt(stats.ci95_low)}–${fmt(stats.ci95_high)}` : "—";
       document.getElementById("vel-ci").textContent = ci;
-      drawVelocityChart(stats.hist_bins, stats.hist_counts);
+
+      // build labels as bin ranges
+      const bins = stats.hist_bins || [];
+      const counts = stats.hist_counts || [];
+      const labels = [];
+      for (let i=0;i<Math.max(0, bins.length-1);i++){
+        labels.push(`${fmt(bins[i],2)}–${fmt(bins[i+1],2)}`);
+      }
+      const data = counts.slice(0, labels.length);
+
+      const ctx = document.getElementById("velChart").getContext("2d");
+      if (velChart) velChart.destroy();
+      velChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Velocity histogram',
+            data,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { title: { display:true, text:'Velocity' }, ticks:{ maxRotation:0, autoSkip:true } },
+            y: { title: { display:true, text:'Count' }, beginAtZero:true, precision:0 }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                title: (items)=> items.length? `Bin: ${labels[items[0].dataIndex]}` : '',
+                label: (item)=> `Count: ${item.formattedValue}`
+              }
+            },
+            legend: { display:false }
+          }
+        }
+      });
     }
 
     // clear helpers
@@ -233,7 +261,11 @@
       vectorLayers = [];
       pointsGroup.clearLayers();
       pointsAll = [];
-      timeDates = []; timeIndexOf = {};
+      timeDates = []; timeIndexOf = {}; dateKeyGlobal = null;
+      const slider = document.getElementById("time");
+      slider.min=0; slider.max=0; slider.value=0; slider.disabled=true;
+      document.getElementById("time-start").textContent = "—";
+      document.getElementById("time-current").textContent = "—";
     }
 
     // add layers
@@ -247,32 +279,59 @@
       try { map.fitBounds(layer.getBounds()); } catch {}
     }
 
+    function detectDateKey(sampleProps){
+      if (!sampleProps) return null;
+      const keys = Object.keys(sampleProps);
+      const cand = keys.find(k => /^(date_iso|date|fecha|datetime|fec)$/i.test(k));
+      return cand || null;
+    }
+    function toISODate(s){
+      if (!s && s!==0) return null;
+      const d = new Date(s);
+      if (!isNaN(d)) return d.toISOString().slice(0,10);
+      // try plain YYYY-MM-DD
+      const m = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (m) {
+        const mm = m[2].padStart(2,'0'), dd = m[3].padStart(2,'0');
+        return `${m[1]}-${mm}-${dd}`;
+      }
+      return null;
+    }
+
     async function addGeoJSON(name, url, kind){
       const gj = await fetch(url).then(r=>r.json());
       if (kind === "points"){
         pointsAll = Array.isArray(gj.features) ? gj.features : [];
+        // robust date key detection
         const sample = pointsAll.find(f=>f && f.properties);
-        const dateKey = sample && ("DATE_ISO" in sample.properties ? "DATE_ISO" :
-                                   ("date" in sample.properties ? "date" : null));
+        dateKeyGlobal = detectDateKey(sample?.properties);
+        // compute date array
         const dates = pointsAll
-          .map(f => (dateKey ? String(f.properties[dateKey]) : null))
-          .filter(s => s && !isNaN(new Date(s)))
-          .map(s => s.slice(0,10));
+          .map(f => toISODate(f?.properties?.[dateKeyGlobal]))
+          .filter(Boolean);
         const uq = Array.from(new Set(dates)).sort();
         timeDates = uq;
         timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
         const slider = document.getElementById("time");
         const tstart = document.getElementById("time-start");
         const tcur = document.getElementById("time-current");
-        if (uq.length){
-          slider.min = 0; slider.max = uq.length - 1; slider.value = uq.length - 1; slider.disabled = false;
-          tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
-          renderPointsAt(parseInt(slider.value), dateKey);
-        } else {
-          slider.min = 0; slider.max = 0; slider.value = 0; slider.disabled = true;
+
+        // if no time info, show ALL points and disable slider
+        if (!uq.length){
+          slider.disabled = true; slider.min=0; slider.max=0; slider.value=0;
           tstart.textContent = "—"; tcur.textContent = "—";
           pointsGroup.clearLayers();
+          const layer = L.geoJSON(gj, {
+            pane: "vectors",
+            pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#0b5fff",weight:1,fillColor:"#7fa6ff",fillOpacity:0.8})
+          }).addTo(pointsGroup);
+          try{ map.fitBounds(layer.getBounds()); }catch{}
+          return;
         }
+
+        slider.min = 0; slider.max = uq.length - 1; slider.value = uq.length - 1; slider.disabled = false;
+        tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
+        renderPointsAt(parseInt(slider.value));
         return;
       }
       const opts = {
@@ -290,23 +349,24 @@
       try{ map.fitBounds(layer.getBounds()); }catch{}
     }
 
-    function renderPointsAt(idx, dateKeyGuess){
+    function renderPointsAt(idx){
       const slider = document.getElementById("time");
       if (typeof idx !== "number") idx = parseInt(slider.value);
       const tcur = document.getElementById("time-current");
       if (!timeDates.length){ tcur.textContent = "—"; pointsGroup.clearLayers(); return; }
       const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
       tcur.textContent = cutoff;
+
       pointsGroup.clearLayers();
-      const dateKey = dateKeyGuess || (pointsAll[0]?.properties?.DATE_ISO ? "DATE_ISO" : "date");
-      const layer = L.geoJSON({
-        type:"FeatureCollection",
-        features: pointsAll.filter(f=>{
-          const s = f.properties?.[dateKey]; if (!s) return false;
-          const d = String(s).slice(0,10);
-          const i = timeIndexOf[d]; return typeof i === "number" && i <= idx;
-        })
-      }, {
+      const cum = document.getElementById("cumulate").checked;
+      const feats = pointsAll.filter(f=>{
+        const iso = toISODate(f?.properties?.[dateKeyGlobal]);
+        if (!iso) return false;
+        const i = timeIndexOf[iso];
+        if (typeof i !== "number") return false;
+        return cum ? (i <= idx) : (i === idx);
+      });
+      const layer = L.geoJSON({type:"FeatureCollection", features:feats}, {
         pane: "vectors",
         pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#0b5fff",weight:1,fillColor:"#7fa6ff",fillOpacity:0.8})
       });
@@ -317,6 +377,9 @@
     // time slider events
     document.getElementById("time").addEventListener("input", e => {
       renderPointsAt(parseInt(e.target.value));
+    });
+    document.getElementById("cumulate").addEventListener("change", () => {
+      renderPointsAt();
     });
     document.getElementById("play").addEventListener("click", () => {
       if (timeTimer) return;
@@ -390,6 +453,11 @@
     };
 
     // apply raster styling
+    function drawLegendFromInputs(){
+      drawLegend(document.getElementById("palette").value,
+                 document.getElementById("pmin").value,
+                 document.getElementById("pmax").value);
+    }
     document.getElementById("apply-style").onclick = async () => {
       const kind = document.getElementById("raster_layer").value;
       const pal  = document.getElementById("palette").value;
@@ -401,7 +469,7 @@
       const js = await resp.json();
       if (js.url){
         rasterOverlays[kind].setUrl(js.url);
-        drawLegend(pal, pmin, pmax);
+        drawLegendFromInputs();
       }
     };
 
@@ -448,9 +516,7 @@
       if (js.urls.ellipse_geojson)   await addGeoJSON("ellipse",  js.urls.ellipse_geojson,  "ellipse");
       if (js.urls.all_points_geojson)await addGeoJSON("CSV points", js.urls.all_points_geojson, "points");
 
-      drawLegend(document.getElementById("palette").value,
-                 document.getElementById("pmin").value,
-                 document.getElementById("pmax").value);
+      drawLegendFromInputs();
     };
   </script>
 </body>

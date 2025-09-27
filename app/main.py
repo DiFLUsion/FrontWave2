@@ -1,4 +1,4 @@
-# app/main.py
+# app/main.py (only small robustness update in export_geojson)
 import os
 import math
 import uuid
@@ -11,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import geopandas as gpd
 
-# paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 STATIC_DIR = os.path.join(ROOT_DIR, "static")
@@ -20,7 +19,6 @@ TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
-# import
 try:
     from .frontwave import run_frontwave
 except ImportError:
@@ -72,7 +70,6 @@ def _raster_stats(path: str) -> dict:
         "hist_bins": edges.tolist(), "hist_counts": counts.tolist()
     }
 
-# color rendering
 def _palette_stops(name: str):
     if name == "viridis":
         return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array(
@@ -98,7 +95,7 @@ def _apply_palette_01(x01: np.ndarray, palette: str):
 def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, palette: str):
     with rasterio.open(src_tif) as src:
         arr = src.read(1, masked=True)
-        bounds = src.bounds  # (W,S,E,N)
+        bounds = src.bounds
     data = np.ma.filled(arr, np.nan).astype(np.float64)
     valid = np.isfinite(data)
     if valid.sum() == 0:
@@ -168,19 +165,20 @@ async def run_process(
         if not gpkg_path or not os.path.exists(gpkg_path):
             return None
         gdf = gpd.read_file(gpkg_path, layer=layer)
+        # ensure DATE_ISO is string to avoid nulls breaking parsing on client
+        if "DATE_ISO" in gdf.columns:
+            gdf["DATE_ISO"] = gdf["DATE_ISO"].astype("string").fillna("")
         if gdf.crs is not None and str(gdf.crs).lower() != "epsg:4326":
             gdf = gdf.to_crs("EPSG:4326")
         out_path = os.path.join(out_dir, out_name)
         gdf.to_file(out_path, driver="GeoJSON")
         return to_url(out_path)
 
-    # GeoJSON layers for Leaflet
     all_points_geojson = export_geojson(res.get("all_points"), "all_pts", "all_points.geojson")
     points_geojson     = export_geojson(res.get("selected_points"), "selected_pts", "selected_points.geojson")
     ellipse_geojson    = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
     contours_geojson   = export_geojson(res.get("contours"), "contours", "contours.geojson")
 
-    # PNG quicklooks for rasters
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
