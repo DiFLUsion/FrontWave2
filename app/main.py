@@ -1,4 +1,4 @@
-# main.py
+# main.py (cabecera)
 import os
 import math
 import uuid
@@ -10,8 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from frontwave import run_frontwave
-
 # --- rutas absolutas seguras ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -20,6 +18,20 @@ TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
+
+# --- import robusto de frontwave ---
+try:
+    # si se ejecuta como paquete: uvicorn app.main:app
+    from .frontwave import run_frontwave  # type: ignore
+except Exception:
+    # si se ejecuta como script: uvicorn main:app
+    import sys
+    if BASE_DIR not in sys.path:
+        sys.path.append(BASE_DIR)
+    from frontwave import run_frontwave  # type: ignore
+
+
+
 
 app = FastAPI(title="FrontWave API")
 
