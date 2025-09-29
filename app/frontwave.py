@@ -1,6 +1,6 @@
-# frontwave.py
+# app/frontwave.py
 # -*- coding: utf-8 -*-
-import os, math, warnings
+import os, math, warnings, sys
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -12,7 +12,6 @@ from rasterio.crs import CRS as RCRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from skimage import measure
 
-import os, sys
 CONDA_PREFIX = os.environ.get("CONDA_PREFIX", sys.prefix)
 proj_dir = os.path.join(CONDA_PREFIX, "Library", "share", "proj")
 gdal_dir = os.path.join(CONDA_PREFIX, "Library", "share", "gdal")
@@ -34,7 +33,7 @@ def guess_utm_epsg(lon, lat):
     return f"EPSG:{32700 + zone if south else 32600 + zone}"
 
 def to_metric_crs(gdf):
-    cx, cy = gdf.geometry.union_all().centroid.xy
+    cx, cy = gdf.geometry.unary_union.centroid.xy
     epsg = guess_utm_epsg(cx[0], cy[0])
     return gdf.to_crs(epsg), epsg
 
@@ -45,7 +44,7 @@ def _pick_column(df, candidates, required=True):
         if k in m:
             return m[k]
     if required:
-        raise ValueError(f"Faltan columnas {candidates}. Disponibles: {list(df.columns)}")
+        raise ValueError(f"Missing columns {candidates}. Available: {list(df.columns)}")
     return None
 
 def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
@@ -54,8 +53,8 @@ def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
                          sep=';', date_format=None, dayfirst=True):
     df = pd.read_csv(csv_path, sep=sep)
 
-    lon_field  = _pick_column(df, [lon_field, "lon","long","longitud","x","lon_wgs84"])
-    lat_field  = _pick_column(df, [lat_field, "lat","latitude","latitud","y","lat_wgs84"])
+    lon_field  = _pick_column(df, [lon_field, "lon","long","longitude","x","lon_wgs84"])
+    lat_field  = _pick_column(df, [lat_field, "lat","latitude","y","lat_wgs84"])
     date_field = _pick_column(df, [date_field, "fecha","date","datetime","fecha_hora","fec"], required=True)
     id_field   = _pick_column(df, [id_field, "id","identificador","codigo"], required=False)
     weight_field = _pick_column(df, [weight_field, "peso","w","weight"], required=False)
@@ -70,13 +69,16 @@ def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
         except TypeError:
             dt = pd.to_datetime(df[date_field], dayfirst=dayfirst, errors="coerce")
     if dt.isna().all():
-        raise ValueError(f"No se pudo parsear fechas en '{date_field}'. Ajusta 'date_format' o 'dayfirst'.")
+        raise ValueError(f"Cannot parse dates in '{date_field}'. Set 'date_format' or 'dayfirst'.")
 
     df = df.loc[~dt.isna()].copy()
     df["N1"] = (dt.loc[~dt.isna()] - ref).dt.days.astype(int)
+    df["DATE_ISO"] = pd.to_datetime(df[date_field], errors="coerce").dt.strftime("%Y-%m-%d")
+    df["DATE_ISO"] = df["DATE_ISO"].fillna("")
 
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df[lon_field], df[lat_field]), crs="EPSG:4326")
-    return gdf, {"date": date_field, "id": id_field, "weight": weight_field, "case": case_field}
+    meta = {"date": date_field, "id": id_field, "weight": weight_field, "case": case_field}
+    return gdf, meta
 
 def make_square_grid(bounds, cell_size):
     xmin, ymin, xmax, ymax = bounds
@@ -209,17 +211,39 @@ def run_frontwave(csv_path, out_folder,
                   sep=';', date_format=None, dayfirst=True):
     os.makedirs(out_folder, exist_ok=True)
 
-    pts_wgs84, _ = read_points_from_csv(
+    # ALL points WGS84 with DATE_ISO
+    pts_wgs84, meta = read_points_from_csv(
         csv_path, lon_field, lat_field, date_field, id_field,
         weight_field, case_field, sep=sep,
         date_format=date_format, dayfirst=dayfirst
     )
+
+    # Save ALL points to GPKG and GeoJSON (WGS84)
+    all_points_gpkg = os.path.join(out_folder, "all_points.gpkg")
+    pts_wgs84.to_file(all_points_gpkg, layer="all_pts", driver="GPKG")
+    all_points_geojson = os.path.join(out_folder, "all_points.geojson")
+    pts_wgs84.to_file(all_points_geojson, driver="GeoJSON")
+
+    # Project for analysis
     pts_m, epsg = to_metric_crs(pts_wgs84)
     selected_m, grid = select_earliest_points_by_cell(pts_m, grid_cell_m)
 
+    # Add DATE_ISO to selected subset and export both GPKG and GeoJSON (WGS84)
+    dcol = meta["date"]
+    try:
+        dt_sel = pd.to_datetime(selected_m[dcol], errors="coerce")
+        selected_m["DATE_ISO"] = dt_sel.dt.strftime("%Y-%m-%d").fillna("")
+    except Exception:
+        selected_m["DATE_ISO"] = ""
+
+    selected_gpkg = os.path.join(out_folder, "selected_points.gpkg")
+    selected_m.to_file(selected_gpkg, layer="selected_pts", driver="GPKG")
+    selected_points_geojson = os.path.join(out_folder, "selected_points.geojson")
+    selected_m.to_crs("EPSG:4326").to_file(selected_points_geojson, driver="GeoJSON")
+
+    # Kriging and rasters
     gx, gy, z = run_ok_kriging(selected_m, value_field="NUM0", cell_size=krige_cell_m, variogram_model="spherical")
 
-    # Rasters: UTM + reproyección a WGS84
     kriging_utm = os.path.join(out_folder, "kriging_utm.tif")
     save_geotiff_utm(kriging_utm, gx, gy, z, epsg)
     kriging_tif = os.path.join(out_folder, "kriging.tif")
@@ -237,16 +261,18 @@ def run_frontwave(csv_path, out_folder,
     velocity_tif = os.path.join(out_folder, "velocity.tif")
     reproject_to_wgs84(velocity_utm, velocity_tif)
 
+    # Vectors: contours and ellipse → GPKG + GeoJSON (WGS84)
     gcont = contours_from_grid(gx, gy, z, interval=contour_interval).set_crs(epsg)
     contours_gpkg = os.path.join(out_folder, "contours.gpkg")
     if len(gcont): gcont.to_file(contours_gpkg, layer="contours", driver="GPKG")
+    contours_geojson = os.path.join(out_folder, "contours.geojson")
+    if len(gcont): gcont.to_crs("EPSG:4326").to_file(contours_geojson, driver="GeoJSON")
 
-    ellipse = standard_deviational_ellipse(pts_m, weight_field=weight_field, group_field=None)
+    ellipse = standard_deviational_ellipse(pts_m, weight_field=meta["weight"], group_field=None)
     ellipse_gpkg = os.path.join(out_folder, "ellipse.gpkg")
     if len(ellipse): ellipse.to_file(ellipse_gpkg, layer="ellipse", driver="GPKG")
-
-    selected_gpkg = os.path.join(out_folder, "selected_points.gpkg")
-    selected_m.to_file(selected_gpkg, layer="selected_pts", driver="GPKG")
+    ellipse_geojson = os.path.join(out_folder, "ellipse.geojson")
+    if len(ellipse): ellipse.to_crs("EPSG:4326").to_file(ellipse_geojson, driver="GeoJSON")
 
     grid_gpkg = os.path.join(out_folder, "grid.gpkg")
     grid.to_file(grid_gpkg, layer="grid", driver="GPKG")
@@ -254,10 +280,16 @@ def run_frontwave(csv_path, out_folder,
     return {
         "kriging": kriging_tif,
         "contours": contours_gpkg,
+        "contours_geojson": contours_geojson if os.path.exists(contours_geojson) else None,
         "slope": slope_tif,
         "velocity": velocity_tif,
         "ellipse": ellipse_gpkg,
+        "ellipse_geojson": ellipse_geojson if os.path.exists(ellipse_geojson) else None,
         "selected_points": selected_gpkg,
+        "selected_points_geojson": selected_points_geojson if os.path.exists(selected_points_geojson) else None,
+        "all_points": all_points_gpkg,
+        "all_points_geojson": all_points_geojson if os.path.exists(all_points_geojson) else None,
         "grid": grid_gpkg,
-        "crs": epsg
+        "crs": epsg,
+        "date_field": dcol
     }

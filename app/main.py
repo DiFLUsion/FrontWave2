@@ -1,7 +1,5 @@
-# app/main.py (only small robustness update in export_geojson)
-import os
-import math
-import uuid
+# app/main.py
+import os, math, uuid
 import numpy as np
 import rasterio
 from fastapi import FastAPI, UploadFile, Form, Query
@@ -9,7 +7,6 @@ from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
-import geopandas as gpd
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
@@ -161,24 +158,6 @@ async def run_process(
         rel = os.path.relpath(p, DATA_DIR).replace("\\", "/")
         return f"/data/{rel}"
 
-    def export_geojson(gpkg_path, layer, out_name):
-        if not gpkg_path or not os.path.exists(gpkg_path):
-            return None
-        gdf = gpd.read_file(gpkg_path, layer=layer)
-        # ensure DATE_ISO is string to avoid nulls breaking parsing on client
-        if "DATE_ISO" in gdf.columns:
-            gdf["DATE_ISO"] = gdf["DATE_ISO"].astype("string").fillna("")
-        if gdf.crs is not None and str(gdf.crs).lower() != "epsg:4326":
-            gdf = gdf.to_crs("EPSG:4326")
-        out_path = os.path.join(out_dir, out_name)
-        gdf.to_file(out_path, driver="GeoJSON")
-        return to_url(out_path)
-
-    all_points_geojson = export_geojson(res.get("all_points"), "all_pts", "all_points.geojson")
-    points_geojson     = export_geojson(res.get("selected_points"), "selected_pts", "selected_points.geojson")
-    ellipse_geojson    = export_geojson(res.get("ellipse"), "ellipse", "ellipse.geojson")
-    contours_geojson   = export_geojson(res.get("contours"), "contours", "contours.geojson")
-
     images = {}
     def add_img(key, tif_path):
         if not tif_path or not os.path.exists(tif_path): return
@@ -200,15 +179,16 @@ async def run_process(
         "selected_points": to_url(res.get("selected_points")),
         "all_points": to_url(res.get("all_points")),
         "grid": to_url(res.get("grid")),
-        "selected_points_geojson": points_geojson,
-        "all_points_geojson": all_points_geojson,
-        "ellipse_geojson": ellipse_geojson,
-        "contours_geojson": contours_geojson,
+        # direct GeoJSON exports (guaranteed WGS84)
+        "selected_points_geojson": to_url(res.get("selected_points_geojson")),
+        "all_points_geojson": to_url(res.get("all_points_geojson")),
+        "ellipse_geojson": to_url(res.get("ellipse_geojson")),
+        "contours_geojson": to_url(res.get("contours_geojson")),
     }
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
-
     meta = {"date_field": res.get("date_field", "date")}
+
     return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats, "meta": meta})
 
 @app.get("/render")
