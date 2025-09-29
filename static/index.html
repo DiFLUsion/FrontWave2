@@ -18,12 +18,14 @@
     section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff }
     h2 { margin:.25rem 0 .75rem; font-size:1.2rem }
     .row { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center }
+    .col { display:flex; flex-direction:column; gap:.5rem }
     label { font-size:.95rem }
     select, input[type="number"], input[type="text"], input[type="range"], input[type="color"] { padding:.35rem .45rem; border:1px solid #bbb; border-radius:8px; }
     input[type="checkbox"] { transform:translateY(1px) }
     .muted { color:var(--muted) }
+    .center { display:flex; justify-content:center; align-items:center; }
 
-    .btn { padding:.5rem .9rem; border:1px solid #aaa; background:#f7f7f7; border-radius:10px; cursor:pointer; font-weight:700 }
+    .btn { padding:.6rem 1rem; border:1px solid #aaa; background:#f7f7f7; border-radius:10px; cursor:pointer; font-weight:700 }
     .btn-primary { background:var(--primary); color:var(--ink); border-color:var(--primary) }
     .btn:disabled { opacity:.6; cursor:not-allowed }
 
@@ -37,26 +39,29 @@
     .chip { background:#f0f0f0; padding:.35rem .7rem; border-radius:999px; font-size:.9rem }
 
     /* Legend panel */
-    .leg-panel { background:#fff; border:1px solid #ccc; border-radius:8px; padding:.6rem; width:240px; max-height:280px; overflow:auto }
-    .leg-item { margin:.35rem 0; }
+    .leg-panel { background:#fff; border:1px solid #ccc; border-radius:8px; padding:.6rem; width:260px; max-height:320px; overflow:auto }
+    .leg-item { margin:.45rem 0; }
     .leg-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; font-size:.9rem }
-    .leg-grad { display:block; width:100%; height:12px; image-rendering:pixelated; border-radius:3px; border:1px solid #ddd; cursor:pointer; margin:.25rem 0 }
+    .leg-grad { display:block; width:100%; height:12px; image-rendering:pixelated; border-radius:3px; border:1px solid #ddd; cursor:pointer; margin:.35rem 0 }
     .leg-meta { font-size:.8rem; color:#444; display:flex; justify-content:space-between }
 
     /* Layer control expanded */
     .leaflet-control-layers { max-height:550px; overflow:auto }
-    .leaflet-control-layers-toggle { display:none } /* keep expanded look */
+    .leaflet-control-layers-toggle { display:none }
     .leaflet-control-layers-expanded { display:block; padding:.5rem .5rem .25rem .5rem; background:#fff; border:1px solid rgba(0,0,0,.25) }
 
     /* Histogram */
-    #vel-chart-wrap { width:720px; max-width:100%; height:360px; background:#fff; border:1px solid #ddd; border-radius:10px; padding:.5rem; resize:both; overflow:auto }
+    #vel-chart-wrap { width:820px; max-width:100%; height:380px; background:#fff; border:1px solid #ddd; border-radius:10px; padding:.5rem; }
     .panel { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin:.5rem 0 }
     .grow { flex:1 1 280px }
-    .kpanel { border:1px dashed #ccc; padding:.5rem; border-radius:8px }
+    .kpanel { border:1px dashed #ccc; padding:.75rem; border-radius:8px }
 
     /* small map widgets */
     .ctrl { background:#fff; border:1px solid rgba(0,0,0,.25); border-radius:6px; padding:.35rem .5rem; font-size:.85rem }
+    .ctrl h4 { margin:.25rem 0; font-size:.95rem }
     .ctrl-btn { background:#fff; border:1px solid #bbb; border-radius:8px; padding:.25rem .5rem; cursor:pointer }
+    .ctrl-row { display:flex; gap:.35rem; align-items:center; flex-wrap:wrap }
+    .sep { height:1px; background:#eee; margin:.35rem 0 }
   </style>
 </head>
 <body>
@@ -68,81 +73,99 @@
 
   <!-- STEP 1 -->
   <section class="card">
-    <h2>Step 1 · Load CSV and set fields</h2>
-    <div class="row">
-      <input type="file" id="csvfile" accept=".csv" />
-      <label>Separator
-        <select id="sep">
-          <option value=";">; (semicolon)</option>
-          <option value=",">, (comma)</option>
-          <option value="\\t">tab</option>
-          <option value="|">| (pipe)</option>
-        </select>
-      </label>
-      <label><input type="checkbox" id="toggle-preview"> Show CSV preview</label>
-      <button id="preview" class="btn">Preview</button>
+    <h2>Step 1 · Prepare input</h2>
+
+    <!-- Box 1: load + preview -->
+    <div class="card" style="margin:0 0 1rem 0">
+      <h3 style="margin:.25rem 0 .6rem">1) Load CSV and preview</h3>
+      <div class="row">
+        <input type="file" id="csvfile" accept=".csv" />
+        <label>Separator
+          <select id="sep">
+            <option value=";">; (semicolon)</option>
+            <option value=",">, (comma)</option>
+            <option value="\\t">tab</option>
+            <option value="|">| (pipe)</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="toggle-preview"> Show CSV preview</label>
+        <button id="preview" class="btn">Preview</button>
+      </div>
+      <div class="table-wrap" id="preview-wrap">
+        <table id="preview-table"></table>
+      </div>
+      <div class="chips" id="preview-info" style="display:none"></div>
+    </div>
+
+    <!-- Box 2: select fields -->
+    <div class="card" style="margin:0 0 1rem 0">
+      <h3 style="margin:.25rem 0 .6rem">2) Select fields</h3>
+      <div class="row">
+        <label>Longitude field (X)
+          <select id="lon_field"></select>
+        </label>
+        <label>Latitude field (Y)
+          <select id="lat_field"></select>
+        </label>
+        <label>Date/time field
+          <select id="date_field"></select>
+        </label>
+        <label>Identifier field
+          <select id="id_field"></select>
+        </label>
+        <label>Weight field
+          <select id="weight_field"></select>
+        </label>
+      </div>
+    </div>
+
+    <!-- Box 3: kriging params -->
+    <div class="card" style="margin:0 0 1rem 0">
+      <h3 style="margin:.25rem 0 .6rem">3) Kriging parameters</h3>
+      <div class="row kpanel">
+        <label>Model
+          <select id="kriging_model">
+            <option value="ordinary">Ordinary Kriging</option>
+            <option value="universal">Universal Kriging</option>
+          </select>
+        </label>
+        <label>Variogram
+          <select id="variogram_model">
+            <option value="spherical">spherical</option>
+            <option value="exponential">exponential</option>
+            <option value="gaussian">gaussian</option>
+            <option value="linear">linear</option>
+            <option value="power">power</option>
+          </select>
+        </label>
+        <label>Sill <input type="number" id="var_sill" placeholder="auto" step="any" style="width:7rem"></label>
+        <label>Range <input type="number" id="var_range" placeholder="auto" step="any" style="width:7rem"></label>
+        <label>Nugget <input type="number" id="var_nugget" placeholder="auto" step="any" style="width:7rem"></label>
+        <label># lags <input type="number" id="nlags" value="6" min="2" max="48" style="width:6rem"></label>
+        <label><input type="checkbox" id="use_weights"> Weighted</label>
+      </div>
+    </div>
+
+    <!-- Box 4: grid/cell/contour -->
+    <div class="card" style="margin:0 0 1rem 0">
+      <h3 style="margin:.25rem 0 .6rem">4) Cell size, grid size, and contour</h3>
+      <div class="row">
+        <label>Grid size (m)
+          <input type="number" id="grid" value="12000" style="width:7rem">
+        </label>
+        <label>Kriging cell (m)
+          <input type="number" id="cell" value="1200" style="width:7rem">
+        </label>
+        <label>Contour interval
+          <input type="number" id="contour" value="30" style="width:6rem">
+        </label>
+      </div>
+    </div>
+
+    <!-- Process button centered -->
+    <div class="center">
       <button id="process" class="btn btn-primary">Process</button>
     </div>
-
-    <div class="row" style="margin-top:.5rem">
-      <label>Longitude field (X)
-        <select id="lon_field"></select>
-      </label>
-      <label>Latitude field (Y)
-        <select id="lat_field"></select>
-      </label>
-      <label>Date/time field
-        <select id="date_field"></select>
-      </label>
-      <label>Identifier field
-        <select id="id_field"></select>
-      </label>
-      <label>Weight field
-        <select id="weight_field"></select>
-      </label>
-      <label>Grid size (m)
-        <input type="number" id="grid" value="12000" style="width:7rem">
-      </label>
-      <label>Kriging cell (m)
-        <input type="number" id="cell" value="1200" style="width:7rem">
-      </label>
-      <label>Contour interval
-        <input type="number" id="contour" value="30" style="width:6rem">
-      </label>
-    </div>
-
-    <!-- Kriging parameters -->
-    <div class="row kpanel" style="margin-top:.5rem">
-      <strong>Kriging parameters</strong>
-      <label>Model
-        <select id="kriging_model">
-          <option value="ordinary">Ordinary Kriging</option>
-          <option value="universal">Universal Kriging</option>
-        </select>
-      </label>
-      <label>Variogram
-        <select id="variogram_model">
-          <option value="spherical">spherical</option>
-          <option value="exponential">exponential</option>
-          <option value="gaussian">gaussian</option>
-          <option value="linear">linear</option>
-          <option value="power">power</option>
-        </select>
-      </label>
-      <label>Sill <input type="number" id="var_sill" placeholder="auto" step="any" style="width:7rem"></label>
-      <label>Range <input type="number" id="var_range" placeholder="auto" step="any" style="width:7rem"></label>
-      <label>Nugget <input type="number" id="var_nugget" placeholder="auto" step="any" style="width:7rem"></label>
-      <label># lags <input type="number" id="nlags" value="6" min="2" max="48" style="width:6rem"></label>
-      <label><input type="checkbox" id="use_weights"> Weighted</label>
-      <label>Drift terms (comma)
-        <input type="text" id="drift_terms" placeholder="regional_linear, specified"/>
-      </label>
-    </div>
-
-    <div class="table-wrap" id="preview-wrap">
-      <table id="preview-table"></table>
-    </div>
-    <div class="chips" id="preview-info" style="display:none"></div>
   </section>
 
   <!-- STEP 2 -->
@@ -182,7 +205,7 @@
       <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
       <div><span id="time-start">—</span> → <strong id="time-current">—</strong></div>
       <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
-      <div class="chip">Visible outbreaks: <span id="outbreak-count">0</span></div>
+      <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
     </div>
 
     <div id="map"></div>
@@ -192,7 +215,7 @@
   <section class="card">
     <h2>Step 3 · Downloads</h2>
     <div class="chips" id="bundle-chip" style="display:none"></div>
-    <details>
+    <details open>
       <summary>Advanced downloads</summary>
       <ul id="downloads"></ul>
     </details>
@@ -209,13 +232,16 @@
       <div class="chip">max: <span id="vel-max">—</span></div>
       <div class="chip">std: <span id="vel-std">—</span></div>
       <div class="chip">95% CI: <span id="vel-ci">—</span></div>
-      <label>Chart height
-        <input type="range" id="hist_h" min="200" max="800" step="20" value="360">
+      <label>Bins
+        <input type="range" id="bins_slider" min="6" max="48" step="1" value="24">
       </label>
+      <button id="hist-copy" class="btn">Copy image</button>
+      <button id="hist-save" class="btn">Save PNG</button>
+      <label><input type="checkbox" id="show_cdf"> Show CDF</label>
     </div>
     <div id="vel-chart-wrap"><canvas id="velChart"></canvas></div>
     <p class="muted" style="margin-top:.5rem">
-      The band shows mean ± 1 SD. Vertical lines mark mean (solid) and median (dashed). Auto stretch 2–98% is used for rasters.
+      Shaded band shows mean ± 1 SD. Solid line = mean. Dashed = median.
     </p>
   </section>
 
@@ -253,22 +279,22 @@
     map.createPane("vectors");  map.getPane("vectors").style.zIndex = 650;
 
     const baseOSM  = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
+    const baseLight = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO, OSM"});
     const baseSat  = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-    const base = {"OSM": baseOSM, "ESRI Imagery": baseSat};
+    const base = {"OSM": baseOSM, "Carto Light": baseLight, "ESRI Imagery": baseSat};
 
     const overlays = {};
     const layerControl = L.control.layers(base, overlays, {collapsed:false}).addTo(map);
-    setTimeout(()=>layerControl.expand(), 50); // expanded by default
+    setTimeout(()=>layerControl.expand(), 50);
 
-    // simple scale
+    // scale + mouse position
     L.control.scale({metric:true, imperial:false}).addTo(map);
-    // mouse position
     const mouseCtrl = L.control({position:'bottomleft'});
     mouseCtrl.onAdd = () => { const d=L.DomUtil.create('div','ctrl'); d.id='mousepos'; d.textContent='Lat: —, Lng: —'; return d; };
     mouseCtrl.addTo(map);
     map.on('mousemove', (e)=>{ document.getElementById('mousepos').textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`; });
 
-    // fit-all button
+    // fit-all control
     const fitCtrl = L.control({position:'topleft'});
     fitCtrl.onAdd = () => {
       const d=L.DomUtil.create('div','ctrl');
@@ -277,6 +303,54 @@
       return d;
     };
     fitCtrl.addTo(map);
+
+    // go-to lat/lon control
+    const gotoCtl = L.control({position:'topleft'});
+    gotoCtl.onAdd = () => {
+      const d=L.DomUtil.create('div','ctrl');
+      d.innerHTML = `<div class="ctrl-row"><input type="number" step="any" id="go_lat" placeholder="lat" style="width:5.5rem"><input type="number" step="any" id="go_lon" placeholder="lon" style="width:5.5rem"><button id="go_btn" class="ctrl-btn">Go</button></div>`;
+      return d;
+    };
+    gotoCtl.addTo(map);
+    document.addEventListener('click', (e)=>{
+      if(e.target && e.target.id==='go_btn'){
+        const lat = parseFloat(document.getElementById('go_lat').value);
+        const lon = parseFloat(document.getElementById('go_lon').value);
+        if (isFinite(lat)&&isFinite(lon)) map.setView([lat,lon], 12);
+      }
+    });
+
+    // simple distance measure
+    let measureMode=false, measureLine=null, measurePts=[];
+    const measCtl = L.control({position:'topleft'});
+    measCtl.onAdd=()=>{ const d=L.DomUtil.create('div','ctrl'); d.innerHTML=`<div class="ctrl-row"><button id="m_toggle" class="ctrl-btn">Measure</button><button id="m_clear" class="ctrl-btn">×</button><span id="m_len" class="muted">0 km</span></div>`; return d; };
+    measCtl.addTo(map);
+    function measureUpdate(){
+      if (!measureLine) return;
+      const latlngs = measureLine.getLatLngs();
+      let m=0; for(let i=1;i<latlngs.length;i++){ m += map.distance(latlngs[i-1], latlngs[i]); }
+      document.getElementById('m_len').textContent = (m/1000).toFixed(3)+' km';
+    }
+    map.on('click', e=>{
+      if (!measureMode) return;
+      if (!measureLine){ measureLine = L.polyline([e.latlng],{color:'#111',weight:2,opacity:.85}).addTo(map); measurePts=[e.latlng]; }
+      else { measureLine.addLatLng(e.latlng); measurePts.push(e.latlng); }
+      measureUpdate();
+    });
+    document.addEventListener('click',(e)=>{
+      if (e.target && e.target.id==='m_toggle'){ measureMode = !measureMode; e.target.textContent = measureMode ? 'Measuring…' : 'Measure'; }
+      if (e.target && e.target.id==='m_clear'){ if (measureLine){ map.removeLayer(measureLine); measureLine=null; measurePts=[]; } document.getElementById('m_len').textContent='0 km'; }
+    });
+
+    // graticule overlay (5°)
+    const graticule = L.layerGroup();
+    for (let lat=-80; lat<=80; lat+=5){
+      const line = L.polyline([[lat,-180],[lat,180]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}); graticule.addLayer(line);
+    }
+    for (let lon=-180; lon<=180; lon+=5){
+      const line = L.polyline([[-85,lon],[85,lon]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}); graticule.addLayer(line);
+    }
+    layerControl.addOverlay(graticule, "Graticule");
 
     function getAllBounds(){
       let b = null;
@@ -288,12 +362,12 @@
     // registries
     let runCount = 0;
     const runSuffix = ()=> `_${runCount}`;
-    const rasterRegistry = {}; // key `${runId}:${kind}` => {layer, bounds, palette, name}
+    const rasterRegistry = {}; // key `${runId}:${kind}` => {layer, bounds, palette, name, runId, kind}
     let currentRunId = null;
 
     // single points layer tied to latest run
     let pointsLayer = null;
-    let pointsAllFeatures = []; // all CSV features from latest run
+    let pointsAllFeatures = []; // CSV features from latest run
     let dateKeyGlobal = null;
     let timeDates = [];
     let timeIndexOf = {};
@@ -316,27 +390,22 @@
 
     function drawGrad(canvas, palette){
       const ctx = canvas.getContext('2d');
-      const w = canvas.width = 200, h = canvas.height = 12;
+      const w = canvas.width = 220, h = canvas.height = 12;
       const grd = ctx.createLinearGradient(0,0,w,0);
-      if (palette === "viridis"){
-        [[0,[68,1,84]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "plasma"){
-        [[0,[13,8,135]],[.25,[126,3,168]],[.5,[203,71,119]],[.75,[248,149,64]],[1,[240,249,33]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "magma"){
-        [[0,[0,0,4]],[.25,[84,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "inferno"){
-        [[0,[0,0,3]],[.25,[87,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "cividis"){
-        [[0,[0,32,77]],[.25,[44,81,96]],[.5,[90,123,101]],[.75,[160,178,86]],[1,[255,233,69]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "terrain"){
-        [[0,[0,120,0]],[.25,[173,221,142]],[.5,[255,255,191]],[.75,[253,174,97]],[1,[215,25,28]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "turbo"){
-        [[0,[48,18,59]],[.25,[31,154,170]],[.5,[52,209,91]],[.75,[236,200,52]],[1,[220,47,2]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "coolwarm"){
-        [[0,[59,76,192]],[.5,[221,221,221]],[1,[180,4,38]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else if (palette === "heat"){
-        [[0,[0,0,128]],[.25,[0,255,255]],[.5,[255,255,0]],[.75,[255,128,0]],[1,[128,0,0]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
-      } else { grd.addColorStop(0,"#000"); grd.addColorStop(1,"#fff"); }
+      const add = (p,c)=>grd.addColorStop(p,`rgb(${c[0]},${c[1]},${c[2]})`);
+      const P = {
+        viridis:[[0,[68,1,84]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]],
+        plasma:[[0,[13,8,135]],[.25,[126,3,168]],[.5,[203,71,119]],[.75,[248,149,64]],[1,[240,249,33]]],
+        magma:[[0,[0,0,4]],[.25,[84,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]],
+        inferno:[[0,[0,0,3]],[.25,[87,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]],
+        cividis:[[0,[0,32,77]],[.25,[44,81,96]],[.5,[90,123,101]],[.75,[160,178,86]],[1,[255,233,69]]],
+        terrain:[[0,[0,120,0]],[.25,[173,221,142]],[.5,[255,255,191]],[.75,[253,174,97]],[1,[215,25,28]]],
+        turbo:[[0,[48,18,59]],[.25,[31,154,170]],[.5,[52,209,91]],[.75,[236,200,52]],[1,[220,47,2]]],
+        coolwarm:[[0,[59,76,192]],[.5,[221,221,221]],[1,[180,4,38]]],
+        heat:[[0,[0,0,128]],[.25,[0,255,255]],[.5,[255,255,0]],[.75,[255,128,0]],[1,[128,0,0]]],
+        gray:[[0,[0,0,0]],[1,[255,255,255]]]
+      }[palette] || [[0,[0,0,0]],[1,[255,255,255]]];
+      P.forEach(([p,c])=>add(p,c));
       ctx.fillStyle = grd; ctx.fillRect(0,0,w,h);
     }
 
@@ -351,7 +420,6 @@
         const canvas = document.createElement('canvas'); canvas.className='leg-grad';
         drawGrad(canvas, info.palette);
         canvas.addEventListener('click', async ()=>{
-          // cycle palette
           const idx = (PALETTES.indexOf(info.palette)+1) % PALETTES.length;
           await renderRasterWithPalette(info.runId, info.kind, PALETTES[idx], info);
           updateLegendsUI();
@@ -442,12 +510,10 @@
       if (!info) return;
       info.layer.setUrl(js.url);
       info.palette = palette;
-      // sync UI selects if this one is selected
       const sel = document.getElementById("raster_layer");
       if (sel.value === key){ document.getElementById("palette").value = palette; }
     }
 
-    // opacity control
     document.getElementById("raster_opacity").addEventListener("input", (e)=>{
       const sel = document.getElementById("raster_layer").value;
       const info = rasterRegistry[sel]; if (!info) return;
@@ -509,12 +575,13 @@
           pane:'vectors',
           pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
         }).addTo(map);
+        overlays[`CSV points ${runSuffix()}`] = pointsLayer;
+        layerControl.addOverlay(pointsLayer, `CSV points ${runSuffix()}`);
       } else {
         pointsLayer.clearLayers();
         pointsLayer.addData({type:"FeatureCollection", features:feats});
       }
-      const n = feats.length;
-      document.getElementById('outbreak-count').textContent = n.toString();
+      document.getElementById('outbreak-count').textContent = String(feats.length);
     }
 
     document.getElementById("time").addEventListener("input", e => renderPointsAt(parseInt(e.target.value)));
@@ -534,15 +601,41 @@
 
     // ---------- velocity stats & histogram ----------
     let velChart = null;
-    const chartWrap = document.getElementById("vel-chart-wrap");
-    const ro = new ResizeObserver(()=>{ if (velChart) velChart.resize(); });
-    ro.observe(chartWrap);
-    document.getElementById("hist_h").addEventListener("input", (e)=>{
-      chartWrap.style.height = `${e.target.value}px`;
-      if (velChart) velChart.resize();
-    });
+    let velStats = null; // raw stats from backend
+    let showCDF = false;
+
+    function buildHistogram(stats, requestedBins){
+      // original bins count
+      const edges = stats.hist_bins || [];
+      const counts = stats.hist_counts || [];
+      const M = Math.max(0, edges.length-1);
+      if (M === 0) return {labels:[], counts:[], edges:[]};
+
+      // snap requested bins to a divisor of M
+      const divisors = [2,3,4,6,8,12,24,48].filter(d => M % d === 0 && d>=6 && d<=48);
+      let target = requestedBins || M;
+      let snapped = divisors.reduce((a,b)=> Math.abs(b-target) < Math.abs(a-target) ? b : a, divisors[0]);
+      const g = M / snapped; // group size
+
+      const newCounts = [];
+      const newEdges = [];
+      for(let i=0;i<snapped;i++){
+        const lo = i*g, hi = (i+1)*g;
+        let s=0;
+        for(let k=lo;k<hi;k++) s += counts[k];
+        newCounts.push(s);
+        newEdges.push(edges[lo]);
+      }
+      newEdges.push(edges[M]); // last edge
+      const labels = [];
+      for(let i=0;i<snapped;i++){
+        labels.push(`${fmt(newEdges[i],2)}–${fmt(newEdges[i+1],2)}`);
+      }
+      return {labels, counts:newCounts, edges:newEdges, snapped};
+    }
 
     function renderVelocitySummary(stats){
+      velStats = stats;
       const card = document.getElementById("stats-card");
       if(!stats || !Number.isFinite(stats.count)){ card.style.display="none"; return; }
       card.style.display="";
@@ -555,15 +648,22 @@
       const ci = (stats.ci95_low!=null && stats.ci95_high!=null) ? `${fmt(stats.ci95_low)}–${fmt(stats.ci95_high)}` : "—";
       document.getElementById("vel-ci").textContent = ci;
 
-      const bins = stats.hist_bins || []; const counts = stats.hist_counts || [];
-      const labels = []; for (let i=0;i<Math.max(0,bins.length-1);i++){ labels.push(`${fmt(bins[i],2)}–${fmt(bins[i+1],2)}`); }
-      const data = counts.slice(0, labels.length);
-      const mean = stats.mean, std = stats.std, med = stats.p50;
+      drawHistogram(); // initial render
+    }
+
+    function drawHistogram(){
+      if (!velStats){ return; }
+      const requested = parseInt(document.getElementById('bins_slider').value);
+      const {labels, counts, edges, snapped} = buildHistogram(velStats, requested);
+      document.getElementById('bins_slider').title = `Using ${snapped} bins (snapped to backend resolution)`;
+
+      const mean = velStats.mean, std = velStats.std, med = velStats.p50;
       const ctx = document.getElementById("velChart").getContext("2d");
       if (velChart) velChart.destroy();
-      velChart = new Chart(ctx, {
+
+      const cfg = {
         type: 'bar',
-        data: { labels, datasets: [{ label: 'Velocity histogram', data, borderWidth: 1 }] },
+        data: { labels, datasets: [{ label: 'Velocity histogram', data: counts, borderWidth: 1 }] },
         options: {
           responsive:true, maintainAspectRatio:false,
           plugins:{
@@ -572,34 +672,28 @@
               annotations:{
                 stdBand:{
                   type:'box',
-                  xMin: (()=>{ // map mean-std to label index positions
-                    let x = mean-std; let i = bins.findIndex(v=>v>=x); return i<=0?0:i-1;
-                  })(),
-                  xMax: (()=>{
-                    let x = mean+std; let i = bins.findIndex(v=>v>=x); return i<=0?labels.length-1:Math.min(labels.length-1,i-1);
-                  })(),
-                  backgroundColor:'rgba(0, 123, 255, 0.10)',
-                  borderWidth:0
+                  xMin:(()=>{ let x=mean-std; let i=edges.findIndex(v=>v>=x); return Math.max(0,i-1); })(),
+                  xMax:(()=>{ let x=mean+std; let i=edges.findIndex(v=>v>=x); return Math.max(0,Math.min(labels.length-1,i-1)); })(),
+                  backgroundColor:'rgba(0, 123, 255, 0.10)', borderWidth:0
                 },
                 meanLine:{
-                  type:'line', xMin: (()=>{
-                    let i = bins.findIndex(v=>v>=mean); return i<=0?0:i-1;
-                  })(), xMax:(()=>{
-                    let i = bins.findIndex(v=>v>=mean); return i<=0?0:i-1;
-                  })(),
-                  borderColor:'#0b5fff', borderWidth:2, label:{ display:true, content:`mean ${fmt(mean,2)}`, position:'start', backgroundColor:'rgba(11,95,255,.15)' }
+                  type:'line', xMin:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
+                  xMax:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
+                  borderColor:'#0b5fff', borderWidth:2,
+                  label:{ display:true, content:`mean ${fmt(mean,2)}`, position:'start', backgroundColor:'rgba(11,95,255,.15)' }
                 },
                 medLine:{
-                  type:'line', xMin:(()=>{ let i=bins.findIndex(v=>v>=med); return i<=0?0:i-1; })(),
-                  xMax:(()=>{ let i=bins.findIndex(v=>v>=med); return i<=0?0:i-1; })(),
-                  borderColor:'#444', borderDash:[6,4], borderWidth:2, label:{ display:true, content:`median ${fmt(med,2)}`, position:'end', backgroundColor:'rgba(0,0,0,.08)' }
+                  type:'line', xMin:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
+                  xMax:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
+                  borderColor:'#444', borderDash:[6,4], borderWidth:2,
+                  label:{ display:true, content:`median ${fmt(med,2)}`, position:'end', backgroundColor:'rgba(0,0,0,.08)' }
                 }
               }
             },
             tooltip:{ callbacks:{
               afterBody:(ctx)=>{
                 const i = ctx[0].dataIndex;
-                const lo = bins[i]; const hi = bins[i+1];
+                const lo = edges[i]; const hi = edges[i+1];
                 return [`bin: ${fmt(lo,2)}–${fmt(hi,2)}`, `within mean±SD: ${ (lo<=mean+std && hi>=mean-std) ? 'yes':'no' }`];
               }
             }}
@@ -609,8 +703,48 @@
             y:{ title:{ display:true, text:'Count' }, beginAtZero:true, precision:0 }
           }
         }
-      });
+      };
+
+      if (document.getElementById('show_cdf').checked){
+        // CDF line overlay
+        const total = counts.reduce((a,b)=>a+b,0)||1;
+        let cum=0; const cdf=counts.map(v=>{ cum+=v; return cum/total; });
+        cfg.data.datasets.push({ type:'line', label:'CDF', data:cdf, yAxisID:'y1', pointRadius:0, borderWidth:2 });
+        cfg.options.scales.y1 = { position:'right', min:0, max:1, title:{display:true, text:'CDF'} };
+      }
+      velChart = new Chart(ctx, cfg);
     }
+
+    document.getElementById('bins_slider').addEventListener('input', drawHistogram);
+    document.getElementById('show_cdf').addEventListener('change', drawHistogram);
+
+    // copy/save histogram image
+    function saveCanvasPNG(canvas, filename){
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+    async function copyCanvasToClipboard(canvas){
+      if (navigator.clipboard && window.ClipboardItem){
+        return new Promise(res=>canvas.toBlob(async b=>{
+          try{
+            await navigator.clipboard.write([new ClipboardItem({'image/png': b})]);
+            res(true);
+          }catch{ res(false); }
+        }, 'image/png'));
+      }
+      return false;
+    }
+    document.getElementById('hist-save').addEventListener('click', ()=>{
+      const c = document.getElementById('velChart');
+      saveCanvasPNG(c, 'velocity_histogram.png');
+    });
+    document.getElementById('hist-copy').addEventListener('click', async ()=>{
+      const c = document.getElementById('velChart');
+      const ok = await copyCanvasToClipboard(c);
+      if(!ok) alert('Copy not supported by this browser');
+    });
 
     // ---------- PROCESS ----------
     document.getElementById("apply-style").onclick = async () => {
@@ -644,8 +778,6 @@
       const vn = document.getElementById("var_nugget").value.trim(); if (vn!=="") fd.append("var_nugget", vn);
       fd.append("nlags", document.getElementById("nlags").value || 6);
       fd.append("weight", document.getElementById("use_weights").checked ? "true" : "false");
-      const drift = document.getElementById("drift_terms").value.trim();
-      if (drift) fd.append("drift_terms", drift);
 
       const r = await fetch("/run", { method:"POST", body:fd });
       const js = await r.json();
@@ -680,8 +812,8 @@
       // velocity stats
       renderVelocitySummary(js?.stats?.velocity);
 
-      // rasters
-      const names = {kriging:`Kriging surface ${suffix}`, slope:`Slope (deg) ${suffix}`, velocity:`Velocity (1/deg) ${suffix}`};
+      // rasters (names without "(deg)")
+      const names = {kriging:`Kriging surface ${suffix}`, slope:`Slope ${suffix}`, velocity:`Velocity ${suffix}`};
       if (js.images?.kriging)  addImage(js.run_id, "kriging",  js.images.kriging.url,  js.images.kriging.bounds,  names.kriging);
       if (js.images?.slope)    addImage(js.run_id, "slope",    js.images.slope.url,    js.images.slope.bounds,    names.slope);
       if (js.images?.velocity) addImage(js.run_id, "velocity", js.images.velocity.url, js.images.velocity.bounds, names.velocity);
@@ -706,15 +838,11 @@
       if (js.urls.all_points_geojson){
         const gj = await fetchJSON(js.urls.all_points_geojson);
         pointsAllFeatures = Array.isArray(gj.features) ? gj.features : [];
-        // detect date key
-        const sample = pointsAllFeatures.find(f=>f && f.properties);
-        dateKeyGlobal = "DATE_ISO"; // backend wrote this
-        if (sample && !('DATE_ISO' in (sample.properties||{}))) {
-          // fallback to backend meta
-          dateKeyGlobal = js?.meta?.date_field || Object.keys(sample.properties)[0];
-        }
-        // build timeline
-        const dates = pointsAllFeatures.map(f => toISODate(f?.properties?.DATE_ISO || f?.properties?.[dateKeyGlobal])).filter(Boolean);
+        dateKeyGlobal = "DATE_ISO";
+        const dates = pointsAllFeatures.map(f => {
+          const v = f?.properties?.DATE_ISO || f?.properties?.[js?.meta?.date_field || 'date'];
+          return toISODate(v);
+        }).filter(Boolean);
         const uq = Array.from(new Set(dates)).sort();
         timeDates = uq;
         timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
@@ -727,7 +855,6 @@
           slider.min=0; slider.max=uq.length-1; slider.value=uq.length-1; slider.disabled=false;
           tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
         }
-        // create and add layer
         pointsLayer = L.geoJSON({type:"FeatureCollection", features:[]}, {
           pane:'vectors',
           pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
@@ -737,7 +864,6 @@
         renderPointsAt(parseInt(slider.value));
       }
 
-      // expand layers UI
       layerControl.expand();
 
       // log run
@@ -749,12 +875,12 @@
       const t0 = timeDates[0] || '—', t1 = timeDates[timeDates.length-1] || '—';
       card.innerHTML = `<strong>Run ${runCount}</strong><br>
         Grid: ${p.grid_m} m · Cell: ${p.cell_m} m · Contour: ${p.contour}<br>
-        Kriging: ${p.kriging_model}/${p.variogram_model} · lags=${p.nlags} · weighted=${p.weight} · drift=[${(p.drift_terms||[]).join(', ')}]<br>
+        Kriging: ${p.kriging_model}/${p.variogram_model} · lags=${p.nlags} · weighted=${p.weight}<br>
         Points: ${npts} · Date range: ${t0} → ${t1}`;
       lg.prepend(card);
     };
 
-    // ---------- hook raster select -> palette select sync ----------
+    // sync raster select -> palette select
     document.getElementById("raster_layer").addEventListener('change', (e)=>{
       const info = rasterRegistry[e.target.value];
       if (!info) return;
