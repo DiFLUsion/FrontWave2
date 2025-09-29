@@ -1,4 +1,4 @@
-<!-- static/index.html -->
+<!-- static/index.html (replace full file) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +13,7 @@
     section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
     .row { display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center }
     label { font-size:0.9rem }
-    select, input[type="number"], input[type="range"] { padding:0.3rem }
+    select, input[type="number"], input[type="range"], input[type="color"] { padding:0.3rem }
     .muted { color:var(--muted); font-size:0.9em }
     #map { height:560px; margin:1rem 0 }
     .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd }
@@ -31,7 +31,7 @@
     .btn-primary { background:var(--primary); color:var(--primary-ink); border-color:var(--primary) }
     .panel { display:flex; gap:1rem; align-items:center; flex-wrap:wrap }
     .vbox { display:flex; gap:.4rem; align-items:center }
-    #vel-chart-wrap { width:420px; max-width:100%; background:#fff; border:1px solid #ddd; border-radius:8px; padding:.5rem }
+    #vel-chart-wrap { width:560px; max-width:100%; height:300px; background:#fff; border:1px solid #ddd; border-radius:8px; padding:.5rem; resize:both; overflow:auto }
   </style>
 </head>
 <body>
@@ -80,9 +80,9 @@
     <div class="row" style="align-items:flex-end">
       <label>Raster layer:
         <select id="raster_layer">
-          <option value="velocity">velocity</option>
-          <option value="kriging">kriging</option>
-          <option value="slope">slope</option>
+          <option value="velocity">Velocity (1/deg)</option>
+          <option value="kriging">Kriging surface</option>
+          <option value="slope">Slope (deg)</option>
         </select>
       </label>
       <label>Palette:
@@ -99,6 +99,15 @@
         <input type="number" id="pmax" value="98" min="50" max="100" step="1" style="width:4.5rem">
       </label>
       <button id="apply-style" class="btn btn-primary">Render raster</button>
+    </div>
+
+    <div class="row" style="align-items:flex-end; margin-top:.5rem">
+      <strong>Point styling:</strong>
+      <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
+      <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
+      <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
+      <label>Opacity <input type="range" id="pt_opacity" value="0.85" min="0.1" max="1" step="0.05" style="width:120px"></label>
+      <button id="apply-pts-style" class="btn">Apply</button>
     </div>
 
     <div class="ts" style="margin:.5rem 0 0">
@@ -130,6 +139,11 @@
       <div class="vbox"><div class="chip">max: <span id="vel-max">—</span></div></div>
       <div class="vbox"><div class="chip">std: <span id="vel-std">—</span></div></div>
       <div class="vbox"><div class="chip">95% CI: <span id="vel-ci">—</span></div></div>
+      <div class="vbox">
+        <label>Histogram height
+          <input type="range" id="hist_h" min="180" max="700" step="20" value="300">
+        </label>
+      </div>
     </div>
     <div id="vel-chart-wrap">
       <canvas id="velChart"></canvas>
@@ -141,22 +155,31 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <script>
+    // robust fetch JSON with cache-bust
+    async function fetchJSON(url){
+      const bust = (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
+      const r = await fetch(url + bust, {cache:'no-store'});
+      const t = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${t.slice(0,160)}`);
+      return JSON.parse(t);
+    }
+
+    // map and panes
     const map = L.map("map").setView([40, -3], 5);
     map.createPane("rasters");  map.getPane("rasters").style.zIndex = 300;
     map.createPane("vectors");  map.getPane("vectors").style.zIndex = 650;
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
 
-    const overlays = {};
-    const layerControl = L.control.layers(null, overlays).addTo(map);
+    const layerControl = L.control.layers(null, {}).addTo(map);
     const rasterOverlays = {};
     const rasterBounds = {};
-    let vectorLayers = [];
     let currentRun = null;
 
-    const pointsAllGroup  = L.layerGroup().addTo(map);
+    // Points groups: keep "all" OFF by default, "time" ON
+    const pointsAllGroup  = L.layerGroup();
     const pointsTimeGroup = L.layerGroup().addTo(map);
-    overlays["CSV points (all)"]  = pointsAllGroup;  layerControl.addOverlay(pointsAllGroup,  "CSV points (all)");
-    overlays["CSV points (time)"] = pointsTimeGroup; layerControl.addOverlay(pointsTimeGroup, "CSV points (time)");
+    layerControl.addOverlay(pointsTimeGroup, "CSV points by date (time)");
+    layerControl.addOverlay(pointsAllGroup,  "CSV points (all)");
 
     let pointsAll = [];
     let timeDates = [];
@@ -164,6 +187,12 @@
     let timeTimer = null;
     let dateKeyGlobal = null;
 
+    // point style state
+    let ptStyle = { fillColor:"#7fa6ff", color:"#0b5fff", radius:4, fillOpacity:0.85, weight:1 };
+    let allPtsLayer = null;
+    let timePtsLayer = null;
+
+    // legend
     const legend = L.control({position:"bottomright"});
     legend.onAdd = function(){
       const div = L.DomUtil.create("div", "legend");
@@ -181,17 +210,26 @@
       const grd = ctx.createLinearGradient(0, 0, c.width, 0);
       if (palette === "viridis"){
         [[0,[68,1,84]],[0.25,[59,82,139]],[0.5,[33,145,140]],[0.75,[94,201,98]],[1,[253,231,37]]]
-          .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
+        .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
       } else if (palette === "heat"){
         [[0,[0,0,128]],[0.25,[0,255,255]],[0.5,[255,255,0]],[0.75,[255,128,0]],[1,[128,0,0]]]
-          .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
+        .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
       } else { grd.addColorStop(0,"#000"); grd.addColorStop(1,"#fff"); }
       ctx.fillStyle = grd; ctx.fillRect(0,0,c.width,c.height);
       document.getElementById("leg-min").textContent = `pmin ${vmin}`;
       document.getElementById("leg-max").textContent = `pmax ${vmax}`;
     }
 
+    // velocity summary + resizable chart
     let velChart = null;
+    const chartWrap = document.getElementById("vel-chart-wrap");
+    const ro = new ResizeObserver(()=>{ if (velChart) velChart.resize(); });
+    ro.observe(chartWrap);
+    document.getElementById("hist_h").addEventListener("input", (e)=>{
+      chartWrap.style.height = `${e.target.value}px`;
+      if (velChart) velChart.resize();
+    });
+
     function fmt(x, d=3){ return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
     function fmi(x){ return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
 
@@ -227,31 +265,21 @@
             x: { title: { display:true, text:'Velocity' }, ticks:{ maxRotation:0, autoSkip:true } },
             y: { title: { display:true, text:'Count' }, beginAtZero:true, precision:0 }
           },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                title: (items)=> items.length? `Bin: ${labels[items[0].dataIndex]}` : '',
-                label: (item)=> `Count: ${item.formattedValue}`
-              }
-            },
-            legend: { display:false }
-          }
+          plugins: { legend: { display:false } }
         }
       });
     }
 
+    // helpers
     function clearRasters(){
       Object.values(rasterOverlays).forEach(l=>{ try{ layerControl.removeLayer(l); map.removeLayer(l);}catch{} });
       for (const k of Object.keys(rasterOverlays)) delete rasterOverlays[k];
       for (const k of Object.keys(rasterBounds)) delete rasterBounds[k];
     }
     function clearVectors(){
-      vectorLayers.forEach(l=>{ try{ layerControl.removeLayer(l); map.removeLayer(l);}catch{} });
-      vectorLayers = [];
-      pointsAllGroup.clearLayers();
-      pointsTimeGroup.clearLayers();
-      pointsAll = [];
-      timeDates = []; timeIndexOf = {}; dateKeyGlobal = null;
+      pointsAllGroup.clearLayers(); allPtsLayer = null;
+      pointsTimeGroup.clearLayers(); timePtsLayer = null;
+      pointsAll = []; timeDates = []; timeIndexOf = {}; dateKeyGlobal = null;
       const slider = document.getElementById("time");
       slider.min=0; slider.max=0; slider.value=0; slider.disabled=true;
       document.getElementById("time-start").textContent = "—";
@@ -259,48 +287,71 @@
     }
 
     function addImage(name, url, bounds){
-      const layer = L.imageOverlay(url, bounds, {opacity:0.85, pane:"rasters"});
-      layer.addTo(map);
+      const layer = L.imageOverlay(url, bounds, {opacity:0.85, pane:"rasters"}).addTo(map);
       rasterOverlays[name] = layer;
       rasterBounds[name] = bounds;
-      overlays[name] = layer;
-      layerControl.addOverlay(layer, name);
+      const labelMap = {kriging:"Kriging surface", slope:"Slope (deg)", velocity:"Velocity (1/deg)"};
+      layerControl.addOverlay(layer, labelMap[name] || name);
       try { map.fitBounds(layer.getBounds()); } catch {}
     }
 
-    function detectDateKey(sampleProps){
-      if (!sampleProps) return null;
-      const keys = Object.keys(sampleProps);
-      const cand = keys.find(k => /^(date_iso|DATE_ISO|date|fecha|datetime|fec)$/i.test(k));
-      return cand || null;
+    function detectDateKey(props){
+      if (!props) return null;
+      const keys = Object.keys(props);
+      return keys.find(k => /^(date_iso|DATE_ISO|date|fecha|datetime|fec)$/i.test(k)) || null;
     }
     function toISODate(s){
-      if (s === undefined || s === null || s === "") return null;
-      const isoLike = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-      if (isoLike) {
-        const mm = isoLike[2].padStart(2,'0'), dd = isoLike[3].padStart(2,'0');
-        return `${isoLike[1]}-${mm}-${dd}`;
-      }
+      if (s == null || s === "") return null;
+      const m = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
       const d = new Date(s);
       return isNaN(d) ? null : d.toISOString().slice(0,10);
     }
 
-    async function addGeoJSON(name, url, kind){
-      const gj = await fetch(url).then(r=>r.json());
-      if (kind === "points"){
-        // Show ALL points immediately
-        pointsAllGroup.clearLayers();
-        const allLayer = L.geoJSON(gj, {
-          pane: "vectors",
-          pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#0b5fff",weight:1,fillColor:"#7fa6ff",fillOpacity:0.8})
-        }).addTo(pointsAllGroup);
-        try{ map.fitBounds(allLayer.getBounds()); }catch{}
+    function geojsonPointStyle(){ return {
+      pane:"vectors",
+      radius: ptStyle.radius,
+      color: ptStyle.color,
+      weight: ptStyle.weight,
+      fillColor: ptStyle.fillColor,
+      fillOpacity: ptStyle.fillOpacity
+    };}
 
-        // Build time index
+    function restyleGeoJSON(layer){
+      if (!layer) return;
+      layer.setStyle({
+        color: ptStyle.color,
+        weight: ptStyle.weight,
+        fillColor: ptStyle.fillColor,
+        fillOpacity: ptStyle.fillOpacity
+      });
+      layer.eachLayer(l => { if (l.setRadius) l.setRadius(ptStyle.radius); });
+    }
+
+    document.getElementById("apply-pts-style").addEventListener("click", ()=>{
+      ptStyle.fillColor = document.getElementById("pt_color").value || ptStyle.fillColor;
+      ptStyle.color     = document.getElementById("pt_stroke").value || ptStyle.color;
+      ptStyle.radius    = Math.max(1, Number(document.getElementById("pt_size").value)||ptStyle.radius);
+      ptStyle.fillOpacity = Number(document.getElementById("pt_opacity").value)||ptStyle.fillOpacity;
+      restyleGeoJSON(allPtsLayer);
+      restyleGeoJSON(timePtsLayer);
+    });
+
+    async function addGeoJSON(name, url, kind){
+      const gj = await fetchJSON(url);
+      if (kind === "points"){
+        // ALL points (added to its group; group is OFF by default)
+        pointsAllGroup.clearLayers(); allPtsLayer = null;
+        allPtsLayer = L.geoJSON(gj, {
+          pane: "vectors",
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
+        });
+        allPtsLayer.addTo(pointsAllGroup);
+
+        // time index
         pointsAll = Array.isArray(gj.features) ? gj.features : [];
         const sample = pointsAll.find(f=>f && f.properties);
         dateKeyGlobal = detectDateKey(sample?.properties);
-
         const dates = pointsAll.map(f => toISODate(f?.properties?.[dateKeyGlobal])).filter(Boolean);
         const uq = Array.from(new Set(dates)).sort();
         timeDates = uq;
@@ -313,15 +364,15 @@
         if (!uq.length){
           slider.disabled = true; slider.min=0; slider.max=0; slider.value=0;
           tstart.textContent = "—"; tcur.textContent = "—";
-          pointsTimeGroup.clearLayers();
+          pointsTimeGroup.clearLayers(); timePtsLayer = null;
           return;
         }
-
         slider.min = 0; slider.max = uq.length - 1; slider.value = uq.length - 1; slider.disabled = false;
         tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
         renderPointsAt(parseInt(slider.value));
         return;
       }
+      // contours / ellipse
       const opts = {
         pane: "vectors",
         style: (f) => {
@@ -329,11 +380,11 @@
           if (kind === "ellipse")  return {color:"#aa8800", weight:2, fillColor:"#ffdd77", fillOpacity:0.25};
           return {color:"#d33", weight:1};
         },
-        pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#d33",weight:1,fillColor:"#f88",fillOpacity:0.8})
+        pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
       };
+      const labelByKind = {contours:"Iso-contours", ellipse:"Standard deviation ellipse"};
       const layer = L.geoJSON(gj, opts).addTo(map);
-      vectorLayers.push(layer);
-      overlays[name]=layer; layerControl.addOverlay(layer, name);
+      layerControl.addOverlay(layer, labelByKind[kind] || name);
       try{ map.fitBounds(layer.getBounds()); }catch{}
     }
 
@@ -341,11 +392,11 @@
       const slider = document.getElementById("time");
       if (typeof idx !== "number") idx = parseInt(slider.value);
       const tcur = document.getElementById("time-current");
-      if (!timeDates.length){ tcur.textContent = "—"; pointsTimeGroup.clearLayers(); return; }
+      if (!timeDates.length){ tcur.textContent = "—"; pointsTimeGroup.clearLayers(); timePtsLayer=null; return; }
       const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
       tcur.textContent = cutoff;
 
-      pointsTimeGroup.clearLayers();
+      pointsTimeGroup.clearLayers(); timePtsLayer = null;
       const cum = document.getElementById("cumulate").checked;
       const feats = pointsAll.filter(f=>{
         const iso = toISODate(f?.properties?.[dateKeyGlobal]);
@@ -355,11 +406,11 @@
         return cum ? (i <= idx) : (i === idx);
       });
       if (!feats.length) return;
-      const layer = L.geoJSON({type:"FeatureCollection", features:feats}, {
+      timePtsLayer = L.geoJSON({type:"FeatureCollection", features:feats}, {
         pane: "vectors",
-        pointToLayer: (f, latlng) => L.circleMarker(latlng,{radius:4,color:"#002e99",weight:1,fillColor:"#7fa6ff",fillOpacity:0.85})
+        pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
       });
-      layer.addTo(pointsTimeGroup);
+      timePtsLayer.addTo(pointsTimeGroup);
     }
 
     document.getElementById("time").addEventListener("input", e => {
@@ -383,6 +434,7 @@
       if (timeTimer){ clearInterval(timeTimer); timeTimer = null; }
     });
 
+    // preview helpers
     function fillSelectOptions(select, headers, preferred){
       select.innerHTML = "";
       headers.forEach(h=>{ const opt = document.createElement("option"); opt.value = h; opt.textContent = h; select.appendChild(opt); });
@@ -443,14 +495,13 @@
                  document.getElementById("pmax").value);
     }
     document.getElementById("apply-style").onclick = async () => {
-      const kind = document.getElementById("raster_layer").value;
+      const kind = document.getElementById("raster_layer").value; // key: velocity|kriging|slope
       const pal  = document.getElementById("palette").value;
       const pmin = Number(document.getElementById("pmin").value);
       const pmax = Number(document.getElementById("pmax").value);
       if (!currentRun || !rasterOverlays[kind]) { alert("Run the process first and ensure the raster layer exists."); return; }
       const url = `/render?run_id=${encodeURIComponent(currentRun)}&kind=${encodeURIComponent(kind)}&palette=${encodeURIComponent(pal)}&pmin=${pmin}&pmax=${pmax}`;
-      const resp = await fetch(url);
-      const js = await resp.json();
+      const js = await fetchJSON(url);
       if (js.url){
         rasterOverlays[kind].setUrl(js.url);
         drawLegendFromInputs();
@@ -480,10 +531,17 @@
 
       const ul = document.getElementById("downloads");
       ul.innerHTML="";
+      const nice = {
+        kriging:"Kriging surface (GeoTIFF)", slope:"Slope (GeoTIFF)", velocity:"Velocity (GeoTIFF)",
+        contours:"Iso-contours (GPKG)", ellipse:"Standard deviation ellipse (GPKG)",
+        selected_points:"Selected points (GPKG)", all_points:"All points (GPKG)", grid:"Grid (GPKG)",
+        selected_points_geojson:"Selected points (GeoJSON)", all_points_geojson:"All points (GeoJSON)",
+        ellipse_geojson:"Ellipse (GeoJSON)", contours_geojson:"Contours (GeoJSON)"
+      };
       for (const [k,v] of Object.entries(js.urls)) {
         if (v) {
           const li = document.createElement("li");
-          li.innerHTML = `<a href="${v}" target="_blank" rel="noopener">${k}</a>`;
+          li.innerHTML = `<a href="${v}" target="_blank" rel="noopener">${nice[k]||k}</a>`;
           ul.appendChild(li);
         }
       }
