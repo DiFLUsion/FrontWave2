@@ -1,4 +1,4 @@
-<!-- static/index.html (replace full file) -->
+<!-- static/index.html (full file) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,45 +7,71 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
-    :root { --primary:#0b5fff; --primary-ink:#fff; --muted:#555; }
-    body { margin:0; font-family:sans-serif }
-    header { background:#333; color:#fff; padding:1rem }
-    section.card { margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:8px }
-    .row { display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center }
-    label { font-size:0.9rem }
-    select, input[type="number"], input[type="range"], input[type="color"] { padding:0.3rem }
-    .muted { color:var(--muted); font-size:0.9em }
-    #map { height:560px; margin:1rem 0 }
-    .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd }
+    :root { --primary:#0b5fff; --ink:#fff; --muted:#666; }
+    * { box-sizing:border-box }
+    body { margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111 }
+    header { background:#222; color:#fff; padding:1rem 1.25rem }
+    header h1 { margin:0 0 .25rem; font-size:1.4rem }
+    header h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
+    header p { margin:0; color:#b7b7b7; font-size:.9rem }
+
+    section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff }
+    h2 { margin:.25rem 0 .75rem; font-size:1.2rem }
+    .row { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center }
+    label { font-size:.95rem }
+    select, input[type="number"], input[type="text"], input[type="range"], input[type="color"] { padding:.35rem .45rem; border:1px solid #bbb; border-radius:8px; }
+    input[type="checkbox"] { transform:translateY(1px) }
+    .muted { color:var(--muted) }
+
+    .btn { padding:.5rem .9rem; border:1px solid #aaa; background:#f7f7f7; border-radius:10px; cursor:pointer; font-weight:700 }
+    .btn-primary { background:var(--primary); color:var(--ink); border-color:var(--primary) }
+    .btn:disabled { opacity:.6; cursor:not-allowed }
+
+    #map { height:560px; margin:1rem 0; border:1px solid #ddd; border-radius:10px }
+    .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd; border-radius:8px; display:none }
     table { border-collapse:collapse; width:100% }
-    th, td { border:1px solid #ddd; padding:4px 6px; font-size:12px; white-space:nowrap }
-    th { background:#f5f5f5; position:sticky; top:0 }
-    .chips { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0 }
-    .chip { background:#eee; padding:0.4rem 0.8rem; border-radius:18px }
-    .legend { background:#fff; padding:.6rem; border:1px solid #ccc; border-radius:6px; line-height:1.1 }
-    .legend canvas { display:block; width:180px; height:12px; image-rendering:pixelated; margin:.25rem 0 }
-    .legend .ticks { display:flex; justify-content:space-between; font-size:.8rem }
-    .ts { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap }
-    .ts .grow { flex:1 1 260px }
-    .btn { padding:.5rem .9rem; border:1px solid #aaa; background:#f8f8f8; border-radius:8px; cursor:pointer; font-weight:600 }
-    .btn-primary { background:var(--primary); color:var(--primary-ink); border-color:var(--primary) }
-    .panel { display:flex; gap:1rem; align-items:center; flex-wrap:wrap }
-    .vbox { display:flex; gap:.4rem; align-items:center }
-    #vel-chart-wrap { width:560px; max-width:100%; height:300px; background:#fff; border:1px solid #ddd; border-radius:8px; padding:.5rem; resize:both; overflow:auto }
+    th, td { border:1px solid #eee; padding:4px 6px; font-size:12px; white-space:nowrap }
+    th { background:#fafafa; position:sticky; top:0 }
+
+    .chips { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .chip { background:#f0f0f0; padding:.35rem .7rem; border-radius:999px; font-size:.9rem }
+
+    /* Legend panel */
+    .leg-panel { background:#fff; border:1px solid #ccc; border-radius:8px; padding:.6rem; width:240px; max-height:280px; overflow:auto }
+    .leg-item { margin:.35rem 0; }
+    .leg-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; font-size:.9rem }
+    .leg-grad { display:block; width:100%; height:12px; image-rendering:pixelated; border-radius:3px; border:1px solid #ddd; cursor:pointer; margin:.25rem 0 }
+    .leg-meta { font-size:.8rem; color:#444; display:flex; justify-content:space-between }
+
+    /* Layer control expanded */
+    .leaflet-control-layers { max-height:550px; overflow:auto }
+    .leaflet-control-layers-toggle { display:none } /* keep expanded look */
+    .leaflet-control-layers-expanded { display:block; padding:.5rem .5rem .25rem .5rem; background:#fff; border:1px solid rgba(0,0,0,.25) }
+
+    /* Histogram */
+    #vel-chart-wrap { width:720px; max-width:100%; height:360px; background:#fff; border:1px solid #ddd; border-radius:10px; padding:.5rem; resize:both; overflow:auto }
+    .panel { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin:.5rem 0 }
+    .grow { flex:1 1 280px }
+    .kpanel { border:1px dashed #ccc; padding:.5rem; border-radius:8px }
+
+    /* small map widgets */
+    .ctrl { background:#fff; border:1px solid rgba(0,0,0,.25); border-radius:6px; padding:.35rem .5rem; font-size:.85rem }
+    .ctrl-btn { background:#fff; border:1px solid #bbb; border-radius:8px; padding:.25rem .5rem; cursor:pointer }
   </style>
 </head>
 <body>
   <header>
     <h1>FrontWave Tool</h1>
     <h3>Interpolation and velocity with quick stats</h3>
-    <p class="muted">1) Load CSV → 2) Check separator and fields → 3) Process → 4) Map and downloads</p>
+    <p>1) Load CSV → 2) Set fields and kriging params → 3) Process → 4) Map, legends, and downloads</p>
   </header>
 
+  <!-- STEP 1 -->
   <section class="card">
-    <h2>Step 1 · Load CSV</h2>
+    <h2>Step 1 · Load CSV and set fields</h2>
     <div class="row">
       <input type="file" id="csvfile" accept=".csv" />
-      <label>Separator:
+      <label>Separator
         <select id="sep">
           <option value=";">; (semicolon)</option>
           <option value=",">, (comma)</option>
@@ -57,52 +83,91 @@
       <button id="preview" class="btn">Preview</button>
       <button id="process" class="btn btn-primary">Process</button>
     </div>
+
     <div class="row" style="margin-top:.5rem">
-      <label>lon: <select id="lon_field"></select></label>
-      <label>lat: <select id="lat_field"></select></label>
-      <label>date: <select id="date_field"></select></label>
-      <label>id: <select id="id_field"></select></label>
-      <label>weight: <select id="weight_field"></select></label>
-      <label>cases: <select id="case_field"></select></label>
-      <label>grid (m): <input type="number" id="grid" value="12000" style="width:7rem"></label>
-      <label>cell (m): <input type="number" id="cell" value="1200" style="width:7rem"></label>
-      <label>contour: <input type="number" id="contour" value="30" style="width:6rem"></label>
+      <label>Longitude field (X)
+        <select id="lon_field"></select>
+      </label>
+      <label>Latitude field (Y)
+        <select id="lat_field"></select>
+      </label>
+      <label>Date/time field
+        <select id="date_field"></select>
+      </label>
+      <label>Identifier field
+        <select id="id_field"></select>
+      </label>
+      <label>Weight field
+        <select id="weight_field"></select>
+      </label>
+      <label>Grid size (m)
+        <input type="number" id="grid" value="12000" style="width:7rem">
+      </label>
+      <label>Kriging cell (m)
+        <input type="number" id="cell" value="1200" style="width:7rem">
+      </label>
+      <label>Contour interval
+        <input type="number" id="contour" value="30" style="width:6rem">
+      </label>
     </div>
-    <div class="table-wrap" id="preview-wrap" style="display:none">
+
+    <!-- Kriging parameters -->
+    <div class="row kpanel" style="margin-top:.5rem">
+      <strong>Kriging parameters</strong>
+      <label>Model
+        <select id="kriging_model">
+          <option value="ordinary">Ordinary Kriging</option>
+          <option value="universal">Universal Kriging</option>
+        </select>
+      </label>
+      <label>Variogram
+        <select id="variogram_model">
+          <option value="spherical">spherical</option>
+          <option value="exponential">exponential</option>
+          <option value="gaussian">gaussian</option>
+          <option value="linear">linear</option>
+          <option value="power">power</option>
+        </select>
+      </label>
+      <label>Sill <input type="number" id="var_sill" placeholder="auto" step="any" style="width:7rem"></label>
+      <label>Range <input type="number" id="var_range" placeholder="auto" step="any" style="width:7rem"></label>
+      <label>Nugget <input type="number" id="var_nugget" placeholder="auto" step="any" style="width:7rem"></label>
+      <label># lags <input type="number" id="nlags" value="6" min="2" max="48" style="width:6rem"></label>
+      <label><input type="checkbox" id="use_weights"> Weighted</label>
+      <label>Drift terms (comma)
+        <input type="text" id="drift_terms" placeholder="regional_linear, specified"/>
+      </label>
+    </div>
+
+    <div class="table-wrap" id="preview-wrap">
       <table id="preview-table"></table>
     </div>
     <div class="chips" id="preview-info" style="display:none"></div>
   </section>
 
+  <!-- STEP 2 -->
   <section class="card">
-    <h2>Step 2 · Map</h2>
+    <h2>Step 2 · Map & styling</h2>
 
     <div class="row" style="align-items:flex-end">
-      <label>Raster layer:
-        <select id="raster_layer">
-          <option value="velocity">Velocity (1/deg)</option>
-          <option value="kriging">Kriging surface</option>
-          <option value="slope">Slope (deg)</option>
-        </select>
+      <label>Raster layer
+        <select id="raster_layer"></select>
       </label>
-      <label>Palette:
+      <label>Palette
         <select id="palette">
-          <option value="gray">gray</option>
-          <option value="viridis">viridis</option>
-          <option value="heat">heat</option>
+          <option>gray</option><option>viridis</option><option>plasma</option><option>magma</option>
+          <option>inferno</option><option>cividis</option><option>terrain</option><option>turbo</option>
+          <option>coolwarm</option><option>heat</option>
         </select>
       </label>
-      <label>p<sub>min</sub>:
-        <input type="number" id="pmin" value="2" min="0" max="50" step="1" style="width:4.5rem">
-      </label>
-      <label>p<sub>max</sub>:
-        <input type="number" id="pmax" value="98" min="50" max="100" step="1" style="width:4.5rem">
+      <label>Opacity
+        <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
       </label>
       <button id="apply-style" class="btn btn-primary">Render raster</button>
     </div>
 
     <div class="row" style="align-items:flex-end; margin-top:.5rem">
-      <strong>Point styling:</strong>
+      <strong>Point styling</strong>
       <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
       <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
       <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
@@ -110,52 +175,66 @@
       <button id="apply-pts-style" class="btn">Apply</button>
     </div>
 
-    <div class="ts" style="margin:.5rem 0 0">
-      <strong>Time:</strong>
+    <div class="row" style="align-items:center; margin-top:.25rem">
+      <strong>Time</strong>
       <button id="play" class="btn">Play</button>
       <button id="pause" class="btn">Pause</button>
-      <div class="grow">
-        <input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%">
-      </div>
+      <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
       <div><span id="time-start">—</span> → <strong id="time-current">—</strong></div>
       <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
+      <div class="chip">Visible outbreaks: <span id="outbreak-count">0</span></div>
     </div>
 
     <div id="map"></div>
   </section>
 
+  <!-- STEP 3 -->
   <section class="card">
     <h2>Step 3 · Downloads</h2>
-    <ul id="downloads"></ul>
+    <div class="chips" id="bundle-chip" style="display:none"></div>
+    <details>
+      <summary>Advanced downloads</summary>
+      <ul id="downloads"></ul>
+    </details>
   </section>
 
+  <!-- STEP 4 -->
   <section class="card" id="stats-card" style="display:none">
     <h2>Step 4 · Velocity summary</h2>
     <div class="panel">
-      <div class="vbox"><div class="chip">N: <span id="vel-n">—</span></div></div>
-      <div class="vbox"><div class="chip">mean: <span id="vel-mean">—</span></div></div>
-      <div class="vbox"><div class="chip">median: <span id="vel-med">—</span></div></div>
-      <div class="vbox"><div class="chip">min: <span id="vel-min">—</span></div></div>
-      <div class="vbox"><div class="chip">max: <span id="vel-max">—</span></div></div>
-      <div class="vbox"><div class="chip">std: <span id="vel-std">—</span></div></div>
-      <div class="vbox"><div class="chip">95% CI: <span id="vel-ci">—</span></div></div>
-      <div class="vbox">
-        <label>Histogram height
-          <input type="range" id="hist_h" min="180" max="700" step="20" value="300">
-        </label>
-      </div>
+      <div class="chip">N: <span id="vel-n">—</span></div>
+      <div class="chip">mean: <span id="vel-mean">—</span></div>
+      <div class="chip">median: <span id="vel-med">—</span></div>
+      <div class="chip">min: <span id="vel-min">—</span></div>
+      <div class="chip">max: <span id="vel-max">—</span></div>
+      <div class="chip">std: <span id="vel-std">—</span></div>
+      <div class="chip">95% CI: <span id="vel-ci">—</span></div>
+      <label>Chart height
+        <input type="range" id="hist_h" min="200" max="800" step="20" value="360">
+      </label>
     </div>
-    <div id="vel-chart-wrap">
-      <canvas id="velChart"></canvas>
-    </div>
+    <div id="vel-chart-wrap"><canvas id="velChart"></canvas></div>
+    <p class="muted" style="margin-top:.5rem">
+      The band shows mean ± 1 SD. Vertical lines mark mean (solid) and median (dashed). Auto stretch 2–98% is used for rasters.
+    </p>
   </section>
 
+  <!-- STEP 5 -->
+  <section class="card">
+    <h2>Execution log</h2>
+    <div id="run-log" class="row" style="gap:.75rem"></div>
+  </section>
+
+  <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
   <script>
-    // robust fetch JSON with cache-bust
+    // ---------- helpers ----------
+    const PALETTES = ['gray','viridis','plasma','magma','inferno','cividis','terrain','turbo','coolwarm','heat'];
+
     async function fetchJSON(url){
       const bust = (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
       const r = await fetch(url + bust, {cache:'no-store'});
@@ -163,306 +242,138 @@
       if (!r.ok) throw new Error(`HTTP ${r.status}: ${t.slice(0,160)}`);
       return JSON.parse(t);
     }
+    function currentSep(){ const v = document.getElementById("sep").value; return v === "\\t" ? "\t" : v; }
+    function fmt(x, d=3){ return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
+    function fmi(x){ return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
+    function chip(text){ const d=document.createElement("div"); d.className="chip"; d.textContent=text; return d; }
 
-    // map and panes
-    const map = L.map("map").setView([40, -3], 5);
+    // ---------- map ----------
+    const map = L.map("map").setView([40,-3], 5);
     map.createPane("rasters");  map.getPane("rasters").style.zIndex = 300;
     map.createPane("vectors");  map.getPane("vectors").style.zIndex = 650;
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
 
-    const layerControl = L.control.layers(null, {}).addTo(map);
-    const rasterOverlays = {};
-    const rasterBounds = {};
-    let currentRun = null;
+    const baseOSM  = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
+    const baseSat  = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    const base = {"OSM": baseOSM, "ESRI Imagery": baseSat};
 
-    // Points groups: keep "all" OFF by default, "time" ON
-    const pointsAllGroup  = L.layerGroup();
-    const pointsTimeGroup = L.layerGroup().addTo(map);
-    layerControl.addOverlay(pointsTimeGroup, "CSV points by date (time)");
-    layerControl.addOverlay(pointsAllGroup,  "CSV points (all)");
+    const overlays = {};
+    const layerControl = L.control.layers(base, overlays, {collapsed:false}).addTo(map);
+    setTimeout(()=>layerControl.expand(), 50); // expanded by default
 
-    let pointsAll = [];
+    // simple scale
+    L.control.scale({metric:true, imperial:false}).addTo(map);
+    // mouse position
+    const mouseCtrl = L.control({position:'bottomleft'});
+    mouseCtrl.onAdd = () => { const d=L.DomUtil.create('div','ctrl'); d.id='mousepos'; d.textContent='Lat: —, Lng: —'; return d; };
+    mouseCtrl.addTo(map);
+    map.on('mousemove', (e)=>{ document.getElementById('mousepos').textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`; });
+
+    // fit-all button
+    const fitCtrl = L.control({position:'topleft'});
+    fitCtrl.onAdd = () => {
+      const d=L.DomUtil.create('div','ctrl');
+      const b=L.DomUtil.create('button','ctrl-btn',d); b.textContent='Fit all';
+      L.DomEvent.on(b,'click',(e)=>{ e.preventDefault(); const bnd = getAllBounds(); if (bnd) map.fitBounds(bnd.pad(0.05)); });
+      return d;
+    };
+    fitCtrl.addTo(map);
+
+    function getAllBounds(){
+      let b = null;
+      Object.values(rasterRegistry).forEach(o=>{ if (o.layer) b = b ? b.extend(o.layer.getBounds()) : o.layer.getBounds(); });
+      if (pointsLayer){ const pb = pointsLayer.getBounds(); if (pb && pb.isValid()) b = b ? b.extend(pb) : pb; }
+      return b;
+    }
+
+    // registries
+    let runCount = 0;
+    const runSuffix = ()=> `_${runCount}`;
+    const rasterRegistry = {}; // key `${runId}:${kind}` => {layer, bounds, palette, name}
+    let currentRunId = null;
+
+    // single points layer tied to latest run
+    let pointsLayer = null;
+    let pointsAllFeatures = []; // all CSV features from latest run
+    let dateKeyGlobal = null;
     let timeDates = [];
     let timeIndexOf = {};
     let timeTimer = null;
-    let dateKeyGlobal = null;
 
     // point style state
     let ptStyle = { fillColor:"#7fa6ff", color:"#0b5fff", radius:4, fillOpacity:0.85, weight:1 };
-    let allPtsLayer = null;
-    let timePtsLayer = null;
 
-    // legend
-    const legend = L.control({position:"bottomright"});
-    legend.onAdd = function(){
-      const div = L.DomUtil.create("div", "legend");
-      div.innerHTML = `
-        <div><strong>Legend</strong></div>
-        <canvas id="leg-canvas" width="180" height="12"></canvas>
-        <div class="ticks"><span id="leg-min">pmin</span><span id="leg-max">pmax</span></div>`;
-      return div;
-    };
-    legend.addTo(map);
+    // ---------- legends control (all rasters) ----------
+    const LegCtl = L.Control.extend({
+      options: { position:'bottomright' },
+      onAdd: function(){
+        const div = L.DomUtil.create('div','leg-panel');
+        div.id = 'legend-panel';
+        div.innerHTML = '<strong>Legends</strong><div class="muted" style="font-size:.8rem">Click gradient to cycle palette</div><div id="leg-list"></div>';
+        return div;
+      }
+    });
+    map.addControl(new LegCtl());
 
-    function drawLegend(palette, vmin, vmax){
-      const c = document.getElementById("leg-canvas"); if(!c) return;
-      const ctx = c.getContext("2d");
-      const grd = ctx.createLinearGradient(0, 0, c.width, 0);
+    function drawGrad(canvas, palette){
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = 200, h = canvas.height = 12;
+      const grd = ctx.createLinearGradient(0,0,w,0);
       if (palette === "viridis"){
-        [[0,[68,1,84]],[0.25,[59,82,139]],[0.5,[33,145,140]],[0.75,[94,201,98]],[1,[253,231,37]]]
-        .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
+        [[0,[68,1,84]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "plasma"){
+        [[0,[13,8,135]],[.25,[126,3,168]],[.5,[203,71,119]],[.75,[248,149,64]],[1,[240,249,33]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "magma"){
+        [[0,[0,0,4]],[.25,[84,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "inferno"){
+        [[0,[0,0,3]],[.25,[87,15,109]],[.5,[187,55,84]],[.75,[249,142,9]],[1,[252,255,164]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "cividis"){
+        [[0,[0,32,77]],[.25,[44,81,96]],[.5,[90,123,101]],[.75,[160,178,86]],[1,[255,233,69]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "terrain"){
+        [[0,[0,120,0]],[.25,[173,221,142]],[.5,[255,255,191]],[.75,[253,174,97]],[1,[215,25,28]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "turbo"){
+        [[0,[48,18,59]],[.25,[31,154,170]],[.5,[52,209,91]],[.75,[236,200,52]],[1,[220,47,2]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
+      } else if (palette === "coolwarm"){
+        [[0,[59,76,192]],[.5,[221,221,221]],[1,[180,4,38]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
       } else if (palette === "heat"){
-        [[0,[0,0,128]],[0.25,[0,255,255]],[0.5,[255,255,0]],[0.75,[255,128,0]],[1,[128,0,0]]]
-        .forEach(([p,[r,g,b]]) => grd.addColorStop(p, `rgb(${r},${g},${b})`));
+        [[0,[0,0,128]],[.25,[0,255,255]],[.5,[255,255,0]],[.75,[255,128,0]],[1,[128,0,0]]].forEach(([p,[r,g,b]])=>grd.addColorStop(p,`rgb(${r},${g},${b})`));
       } else { grd.addColorStop(0,"#000"); grd.addColorStop(1,"#fff"); }
-      ctx.fillStyle = grd; ctx.fillRect(0,0,c.width,c.height);
-      document.getElementById("leg-min").textContent = `pmin ${vmin}`;
-      document.getElementById("leg-max").textContent = `pmax ${vmax}`;
+      ctx.fillStyle = grd; ctx.fillRect(0,0,w,h);
     }
 
-    // velocity summary + resizable chart
-    let velChart = null;
-    const chartWrap = document.getElementById("vel-chart-wrap");
-    const ro = new ResizeObserver(()=>{ if (velChart) velChart.resize(); });
-    ro.observe(chartWrap);
-    document.getElementById("hist_h").addEventListener("input", (e)=>{
-      chartWrap.style.height = `${e.target.value}px`;
-      if (velChart) velChart.resize();
-    });
-
-    function fmt(x, d=3){ return (x==null || isNaN(x)) ? "—" : Number(x).toFixed(d); }
-    function fmi(x){ return (x==null || isNaN(x)) ? "—" : String(Math.trunc(x)); }
-
-    function renderVelocitySummary(stats){
-      const card = document.getElementById("stats-card");
-      if(!stats || !Number.isFinite(stats.count)){ card.style.display="none"; return; }
-      card.style.display="";
-      document.getElementById("vel-n").textContent   = fmi(stats.count);
-      document.getElementById("vel-mean").textContent= fmt(stats.mean);
-      document.getElementById("vel-med").textContent = fmt(stats.p50);
-      document.getElementById("vel-min").textContent = fmt(stats.min);
-      document.getElementById("vel-max").textContent = fmt(stats.max);
-      document.getElementById("vel-std").textContent = fmt(stats.std);
-      const ci = (stats.ci95_low!=null && stats.ci95_high!=null) ? `${fmt(stats.ci95_low)}–${fmt(stats.ci95_high)}` : "—";
-      document.getElementById("vel-ci").textContent = ci;
-
-      const bins = stats.hist_bins || [];
-      const counts = stats.hist_counts || [];
-      const labels = [];
-      for (let i=0;i<Math.max(0, bins.length-1);i++){
-        labels.push(`${fmt(bins[i],2)}–${fmt(bins[i+1],2)}`);
-      }
-      const data = counts.slice(0, labels.length);
-
-      const ctx = document.getElementById("velChart").getContext("2d");
-      if (velChart) velChart.destroy();
-      velChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Velocity histogram', data, borderWidth: 1 }] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { title: { display:true, text:'Velocity' }, ticks:{ maxRotation:0, autoSkip:true } },
-            y: { title: { display:true, text:'Count' }, beginAtZero:true, precision:0 }
-          },
-          plugins: { legend: { display:false } }
-        }
-      });
-    }
-
-    // helpers
-    function clearRasters(){
-      Object.values(rasterOverlays).forEach(l=>{ try{ layerControl.removeLayer(l); map.removeLayer(l);}catch{} });
-      for (const k of Object.keys(rasterOverlays)) delete rasterOverlays[k];
-      for (const k of Object.keys(rasterBounds)) delete rasterBounds[k];
-    }
-    function clearVectors(){
-      pointsAllGroup.clearLayers(); allPtsLayer = null;
-      pointsTimeGroup.clearLayers(); timePtsLayer = null;
-      pointsAll = []; timeDates = []; timeIndexOf = {}; dateKeyGlobal = null;
-      const slider = document.getElementById("time");
-      slider.min=0; slider.max=0; slider.value=0; slider.disabled=true;
-      document.getElementById("time-start").textContent = "—";
-      document.getElementById("time-current").textContent = "—";
-    }
-
-    function addImage(name, url, bounds){
-      const layer = L.imageOverlay(url, bounds, {opacity:0.85, pane:"rasters"}).addTo(map);
-      rasterOverlays[name] = layer;
-      rasterBounds[name] = bounds;
-      const labelMap = {kriging:"Kriging surface", slope:"Slope (deg)", velocity:"Velocity (1/deg)"};
-      layerControl.addOverlay(layer, labelMap[name] || name);
-      try { map.fitBounds(layer.getBounds()); } catch {}
-    }
-
-    function detectDateKey(props){
-      if (!props) return null;
-      const keys = Object.keys(props);
-      return keys.find(k => /^(date_iso|DATE_ISO|date|fecha|datetime|fec)$/i.test(k)) || null;
-    }
-    function toISODate(s){
-      if (s == null || s === "") return null;
-      const m = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-      if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-      const d = new Date(s);
-      return isNaN(d) ? null : d.toISOString().slice(0,10);
-    }
-
-    function geojsonPointStyle(){ return {
-      pane:"vectors",
-      radius: ptStyle.radius,
-      color: ptStyle.color,
-      weight: ptStyle.weight,
-      fillColor: ptStyle.fillColor,
-      fillOpacity: ptStyle.fillOpacity
-    };}
-
-    function restyleGeoJSON(layer){
-      if (!layer) return;
-      layer.setStyle({
-        color: ptStyle.color,
-        weight: ptStyle.weight,
-        fillColor: ptStyle.fillColor,
-        fillOpacity: ptStyle.fillOpacity
-      });
-      layer.eachLayer(l => { if (l.setRadius) l.setRadius(ptStyle.radius); });
-    }
-
-    document.getElementById("apply-pts-style").addEventListener("click", ()=>{
-      ptStyle.fillColor = document.getElementById("pt_color").value || ptStyle.fillColor;
-      ptStyle.color     = document.getElementById("pt_stroke").value || ptStyle.color;
-      ptStyle.radius    = Math.max(1, Number(document.getElementById("pt_size").value)||ptStyle.radius);
-      ptStyle.fillOpacity = Number(document.getElementById("pt_opacity").value)||ptStyle.fillOpacity;
-      restyleGeoJSON(allPtsLayer);
-      restyleGeoJSON(timePtsLayer);
-    });
-
-    async function addGeoJSON(name, url, kind){
-      const gj = await fetchJSON(url);
-      if (kind === "points"){
-        // ALL points (added to its group; group is OFF by default)
-        pointsAllGroup.clearLayers(); allPtsLayer = null;
-        allPtsLayer = L.geoJSON(gj, {
-          pane: "vectors",
-          pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
+    function updateLegendsUI(){
+      const list = document.getElementById('leg-list');
+      list.innerHTML = '';
+      const entries = Object.entries(rasterRegistry);
+      entries.forEach(([key, info])=>{
+        const div = document.createElement('div'); div.className='leg-item';
+        const head = document.createElement('div'); head.className='leg-head';
+        head.innerHTML = `<span>${info.name}</span><span class="muted" style="font-size:.8rem">${info.palette}</span>`;
+        const canvas = document.createElement('canvas'); canvas.className='leg-grad';
+        drawGrad(canvas, info.palette);
+        canvas.addEventListener('click', async ()=>{
+          // cycle palette
+          const idx = (PALETTES.indexOf(info.palette)+1) % PALETTES.length;
+          await renderRasterWithPalette(info.runId, info.kind, PALETTES[idx], info);
+          updateLegendsUI();
         });
-        allPtsLayer.addTo(pointsAllGroup);
-
-        // time index
-        pointsAll = Array.isArray(gj.features) ? gj.features : [];
-        const sample = pointsAll.find(f=>f && f.properties);
-        dateKeyGlobal = detectDateKey(sample?.properties);
-        const dates = pointsAll.map(f => toISODate(f?.properties?.[dateKeyGlobal])).filter(Boolean);
-        const uq = Array.from(new Set(dates)).sort();
-        timeDates = uq;
-        timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
-
-        const slider = document.getElementById("time");
-        const tstart = document.getElementById("time-start");
-        const tcur = document.getElementById("time-current");
-
-        if (!uq.length){
-          slider.disabled = true; slider.min=0; slider.max=0; slider.value=0;
-          tstart.textContent = "—"; tcur.textContent = "—";
-          pointsTimeGroup.clearLayers(); timePtsLayer = null;
-          return;
-        }
-        slider.min = 0; slider.max = uq.length - 1; slider.value = uq.length - 1; slider.disabled = false;
-        tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
-        renderPointsAt(parseInt(slider.value));
-        return;
-      }
-      // contours / ellipse
-      const opts = {
-        pane: "vectors",
-        style: (f) => {
-          if (kind === "contours") return {color:"#0066cc", weight:1.5, opacity:0.9};
-          if (kind === "ellipse")  return {color:"#aa8800", weight:2, fillColor:"#ffdd77", fillOpacity:0.25};
-          return {color:"#d33", weight:1};
-        },
-        pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
-      };
-      const labelByKind = {contours:"Iso-contours", ellipse:"Standard deviation ellipse"};
-      const layer = L.geoJSON(gj, opts).addTo(map);
-      layerControl.addOverlay(layer, labelByKind[kind] || name);
-      try{ map.fitBounds(layer.getBounds()); }catch{}
+        const meta = document.createElement('div'); meta.className='leg-meta';
+        meta.innerHTML = `<span>auto 2–98%</span><span>PNG overlay</span>`;
+        div.appendChild(head); div.appendChild(canvas); div.appendChild(meta);
+        list.appendChild(div);
+      });
     }
 
-    function renderPointsAt(idx){
-      const slider = document.getElementById("time");
-      if (typeof idx !== "number") idx = parseInt(slider.value);
-      const tcur = document.getElementById("time-current");
-      if (!timeDates.length){ tcur.textContent = "—"; pointsTimeGroup.clearLayers(); timePtsLayer=null; return; }
-      const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
-      tcur.textContent = cutoff;
-
-      pointsTimeGroup.clearLayers(); timePtsLayer = null;
-      const cum = document.getElementById("cumulate").checked;
-      const feats = pointsAll.filter(f=>{
-        const iso = toISODate(f?.properties?.[dateKeyGlobal]);
-        if (!iso) return false;
-        const i = timeIndexOf[iso];
-        if (typeof i !== "number") return false;
-        return cum ? (i <= idx) : (i === idx);
-      });
-      if (!feats.length) return;
-      timePtsLayer = L.geoJSON({type:"FeatureCollection", features:feats}, {
-        pane: "vectors",
-        pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
-      });
-      timePtsLayer.addTo(pointsTimeGroup);
-    }
-
-    document.getElementById("time").addEventListener("input", e => {
-      renderPointsAt(parseInt(e.target.value));
-    });
-    document.getElementById("cumulate").addEventListener("change", () => {
-      renderPointsAt();
-    });
-    document.getElementById("play").addEventListener("click", () => {
-      if (timeTimer) return;
-      const slider = document.getElementById("time");
-      let i = parseInt(slider.value);
-      timeTimer = setInterval(()=>{
-        if (!timeDates.length){ clearInterval(timeTimer); timeTimer=null; return; }
-        i = (i + 1 <= parseInt(slider.max)) ? i + 1 : 0;
-        slider.value = i;
-        renderPointsAt(i);
-      }, 600);
-    });
-    document.getElementById("pause").addEventListener("click", () => {
-      if (timeTimer){ clearInterval(timeTimer); timeTimer = null; }
-    });
-
-    // preview helpers
-    function fillSelectOptions(select, headers, preferred){
-      select.innerHTML = "";
-      headers.forEach(h=>{ const opt = document.createElement("option"); opt.value = h; opt.textContent = h; select.appendChild(opt); });
+    // ---------- UI: field selects and preview ----------
+    function fillSelectOptions(sel, headers, preferred){
+      sel.innerHTML = "";
+      headers.forEach(h=>{ const opt=document.createElement("option"); opt.value=h; opt.textContent=h; sel.appendChild(opt); });
       const idx = headers.findIndex(h => h.toLowerCase() === preferred);
-      if(idx>=0) select.selectedIndex = idx;
+      if(idx>=0) sel.selectedIndex = idx;
     }
-    function renderPreviewTable(headers, rows){
-      const tbl = document.getElementById("preview-table");
-      tbl.innerHTML = "";
-      const thead = document.createElement("thead");
-      const trh = document.createElement("tr");
-      headers.forEach(h=>{ const th=document.createElement("th"); th.textContent=h; trh.appendChild(th); });
-      thead.appendChild(trh);
-      const tbody = document.createElement("tbody");
-      rows.slice(0,50).forEach(r=>{
-        const tr = document.createElement("tr");
-        headers.forEach(h=>{ const td=document.createElement("td"); td.textContent = r[h]; tr.appendChild(td); });
-        tbody.appendChild(tr);
-      });
-      tbl.appendChild(thead); tbl.appendChild(tbody);
-    }
-    function currentSep(){ const v = document.getElementById("sep").value; return v === "\\t" ? "\t" : v; }
-
-    document.getElementById("toggle-preview").addEventListener("change", (e)=>{
+    document.getElementById("toggle-preview").addEventListener("change",(e)=>{
       document.getElementById("preview-wrap").style.display = e.target.checked ? "" : "none";
       document.getElementById("preview-info").style.display = e.target.checked ? "" : "none";
     });
-
     document.getElementById("preview").onclick = async () => {
       const f = document.getElementById("csvfile").files[0];
       if(!f){ alert("Select a CSV"); return; }
@@ -478,34 +389,236 @@
           fillSelectOptions(document.getElementById("date_field"), headers, "date");
           fillSelectOptions(document.getElementById("id_field"), headers, "id");
           fillSelectOptions(document.getElementById("weight_field"), headers, "weight");
-          fillSelectOptions(document.getElementById("case_field"), headers, "cases");
-          renderPreviewTable(headers, data);
+          const tbl = document.getElementById("preview-table");
+          tbl.innerHTML = "";
+          const thead = document.createElement("thead");
+          const trh = document.createElement("tr");
+          headers.forEach(h=>{ const th=document.createElement("th"); th.textContent=h; trh.appendChild(th); });
+          thead.appendChild(trh);
+          const tbody = document.createElement("tbody");
+          data.slice(0,50).forEach(r=>{
+            const tr=document.createElement("tr");
+            headers.forEach(h=>{ const td=document.createElement("td"); td.textContent = r[h]; tr.appendChild(td); });
+            tbody.appendChild(tr);
+          });
+          tbl.appendChild(thead); tbl.appendChild(tbody);
+          document.getElementById("preview-wrap").style.display = document.getElementById("toggle-preview").checked ? "" : "none";
           const info = document.getElementById("preview-info");
+          info.style.display = document.getElementById("toggle-preview").checked ? "" : "none";
           info.innerHTML = "";
-          const chip = t => { const d=document.createElement("div"); d.className="chip"; d.textContent=t; return d; };
           info.appendChild(chip(`Rows (preview): ${data.length}`));
           info.appendChild(chip(`Separator: ${sep === "\t" ? "tab" : sep}`));
         }
       });
     };
 
-    function drawLegendFromInputs(){
-      drawLegend(document.getElementById("palette").value,
-                 document.getElementById("pmin").value,
-                 document.getElementById("pmax").value);
+    // ---------- raster helpers ----------
+    function addImage(runId, kind, url, bounds, name){
+      const layer = L.imageOverlay(url, bounds, {opacity:0.85, pane:"rasters"}).addTo(map);
+      const key = `${runId}:${kind}`;
+      rasterRegistry[key] = { runId, kind, layer, bounds, palette:'gray', name };
+      overlays[name] = layer; layerControl.addOverlay(layer, name);
+      try { map.fitBounds(layer.getBounds()); } catch {}
+      refreshRasterSelect();
+      updateLegendsUI();
+      layerControl.expand();
     }
-    document.getElementById("apply-style").onclick = async () => {
-      const kind = document.getElementById("raster_layer").value; // key: velocity|kriging|slope
-      const pal  = document.getElementById("palette").value;
-      const pmin = Number(document.getElementById("pmin").value);
-      const pmax = Number(document.getElementById("pmax").value);
-      if (!currentRun || !rasterOverlays[kind]) { alert("Run the process first and ensure the raster layer exists."); return; }
-      const url = `/render?run_id=${encodeURIComponent(currentRun)}&kind=${encodeURIComponent(kind)}&palette=${encodeURIComponent(pal)}&pmin=${pmin}&pmax=${pmax}`;
-      const js = await fetchJSON(url);
-      if (js.url){
-        rasterOverlays[kind].setUrl(js.url);
-        drawLegendFromInputs();
+    function refreshRasterSelect(){
+      const sel = document.getElementById("raster_layer");
+      const cur = sel.value;
+      sel.innerHTML = "";
+      Object.values(rasterRegistry).forEach(info=>{
+        const opt = document.createElement('option');
+        opt.value = `${info.runId}:${info.kind}`;
+        opt.textContent = info.name;
+        sel.appendChild(opt);
+      });
+      if (cur) sel.value = cur;
+    }
+    async function renderRasterWithPalette(runId, kind, palette, infoRef=null){
+      const js = await fetchJSON(`/render?run_id=${encodeURIComponent(runId)}&kind=${encodeURIComponent(kind)}&palette=${encodeURIComponent(palette)}`);
+      const key = `${runId}:${kind}`;
+      const info = infoRef || rasterRegistry[key];
+      if (!info) return;
+      info.layer.setUrl(js.url);
+      info.palette = palette;
+      // sync UI selects if this one is selected
+      const sel = document.getElementById("raster_layer");
+      if (sel.value === key){ document.getElementById("palette").value = palette; }
+    }
+
+    // opacity control
+    document.getElementById("raster_opacity").addEventListener("input", (e)=>{
+      const sel = document.getElementById("raster_layer").value;
+      const info = rasterRegistry[sel]; if (!info) return;
+      info.layer.setOpacity(parseFloat(e.target.value));
+    });
+
+    // ---------- points rendering / time ----------
+    function toISODate(s){
+      if (s == null || s === "") return null;
+      const m = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      const d = new Date(s);
+      return isNaN(d) ? null : d.toISOString().slice(0,10);
+    }
+    function geojsonPointStyle(){ return {
+      pane:"vectors",
+      radius: ptStyle.radius,
+      color: ptStyle.color,
+      weight: ptStyle.weight,
+      fillColor: ptStyle.fillColor,
+      fillOpacity: ptStyle.fillOpacity
+    };}
+
+    function restylePoints(){
+      if (!pointsLayer) return;
+      pointsLayer.setStyle({
+        color: ptStyle.color, weight: ptStyle.weight,
+        fillColor: ptStyle.fillColor, fillOpacity: ptStyle.fillOpacity
+      });
+      pointsLayer.eachLayer(l => { if (l.setRadius) l.setRadius(ptStyle.radius); });
+    }
+    document.getElementById("apply-pts-style").addEventListener("click", ()=>{
+      ptStyle.fillColor = document.getElementById("pt_color").value || ptStyle.fillColor;
+      ptStyle.color     = document.getElementById("pt_stroke").value || ptStyle.color;
+      ptStyle.radius    = Math.max(1, Number(document.getElementById("pt_size").value)||ptStyle.radius);
+      ptStyle.fillOpacity = Number(document.getElementById("pt_opacity").value)||ptStyle.fillOpacity;
+      restylePoints();
+    });
+
+    function renderPointsAt(idx){
+      const slider = document.getElementById("time");
+      if (typeof idx !== "number") idx = parseInt(slider.value);
+      const tcur = document.getElementById("time-current");
+      if (!timeDates.length){ tcur.textContent = "—"; if (pointsLayer) pointsLayer.clearLayers(); document.getElementById('outbreak-count').textContent = '0'; return; }
+      const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
+      tcur.textContent = cutoff;
+
+      const cum = document.getElementById("cumulate").checked;
+      const feats = pointsAllFeatures.filter(f=>{
+        const v = f?.properties?.DATE_ISO || f?.properties?.[dateKeyGlobal];
+        const iso = toISODate(v);
+        if (!iso) return false;
+        const i = timeIndexOf[iso];
+        if (typeof i !== "number") return false;
+        return cum ? (i <= idx) : (i === idx);
+      });
+      if (!pointsLayer){
+        pointsLayer = L.geoJSON({type:"FeatureCollection", features:feats}, {
+          pane:'vectors',
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
+        }).addTo(map);
+      } else {
+        pointsLayer.clearLayers();
+        pointsLayer.addData({type:"FeatureCollection", features:feats});
       }
+      const n = feats.length;
+      document.getElementById('outbreak-count').textContent = n.toString();
+    }
+
+    document.getElementById("time").addEventListener("input", e => renderPointsAt(parseInt(e.target.value)));
+    document.getElementById("cumulate").addEventListener("change", () => renderPointsAt());
+    document.getElementById("play").addEventListener("click", () => {
+      if (timeTimer) return;
+      const slider = document.getElementById("time");
+      let i = parseInt(slider.value);
+      timeTimer = setInterval(()=>{
+        if (!timeDates.length){ clearInterval(timeTimer); timeTimer=null; return; }
+        i = (i + 1 <= parseInt(slider.max)) ? i + 1 : 0;
+        slider.value = i;
+        renderPointsAt(i);
+      }, 600);
+    });
+    document.getElementById("pause").addEventListener("click", () => { if (timeTimer){ clearInterval(timeTimer); timeTimer = null; } });
+
+    // ---------- velocity stats & histogram ----------
+    let velChart = null;
+    const chartWrap = document.getElementById("vel-chart-wrap");
+    const ro = new ResizeObserver(()=>{ if (velChart) velChart.resize(); });
+    ro.observe(chartWrap);
+    document.getElementById("hist_h").addEventListener("input", (e)=>{
+      chartWrap.style.height = `${e.target.value}px`;
+      if (velChart) velChart.resize();
+    });
+
+    function renderVelocitySummary(stats){
+      const card = document.getElementById("stats-card");
+      if(!stats || !Number.isFinite(stats.count)){ card.style.display="none"; return; }
+      card.style.display="";
+      document.getElementById("vel-n").textContent   = fmi(stats.count);
+      document.getElementById("vel-mean").textContent= fmt(stats.mean);
+      document.getElementById("vel-med").textContent = fmt(stats.p50);
+      document.getElementById("vel-min").textContent = fmt(stats.min);
+      document.getElementById("vel-max").textContent = fmt(stats.max);
+      document.getElementById("vel-std").textContent = fmt(stats.std);
+      const ci = (stats.ci95_low!=null && stats.ci95_high!=null) ? `${fmt(stats.ci95_low)}–${fmt(stats.ci95_high)}` : "—";
+      document.getElementById("vel-ci").textContent = ci;
+
+      const bins = stats.hist_bins || []; const counts = stats.hist_counts || [];
+      const labels = []; for (let i=0;i<Math.max(0,bins.length-1);i++){ labels.push(`${fmt(bins[i],2)}–${fmt(bins[i+1],2)}`); }
+      const data = counts.slice(0, labels.length);
+      const mean = stats.mean, std = stats.std, med = stats.p50;
+      const ctx = document.getElementById("velChart").getContext("2d");
+      if (velChart) velChart.destroy();
+      velChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Velocity histogram', data, borderWidth: 1 }] },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{ display:false },
+            annotation:{
+              annotations:{
+                stdBand:{
+                  type:'box',
+                  xMin: (()=>{ // map mean-std to label index positions
+                    let x = mean-std; let i = bins.findIndex(v=>v>=x); return i<=0?0:i-1;
+                  })(),
+                  xMax: (()=>{
+                    let x = mean+std; let i = bins.findIndex(v=>v>=x); return i<=0?labels.length-1:Math.min(labels.length-1,i-1);
+                  })(),
+                  backgroundColor:'rgba(0, 123, 255, 0.10)',
+                  borderWidth:0
+                },
+                meanLine:{
+                  type:'line', xMin: (()=>{
+                    let i = bins.findIndex(v=>v>=mean); return i<=0?0:i-1;
+                  })(), xMax:(()=>{
+                    let i = bins.findIndex(v=>v>=mean); return i<=0?0:i-1;
+                  })(),
+                  borderColor:'#0b5fff', borderWidth:2, label:{ display:true, content:`mean ${fmt(mean,2)}`, position:'start', backgroundColor:'rgba(11,95,255,.15)' }
+                },
+                medLine:{
+                  type:'line', xMin:(()=>{ let i=bins.findIndex(v=>v>=med); return i<=0?0:i-1; })(),
+                  xMax:(()=>{ let i=bins.findIndex(v=>v>=med); return i<=0?0:i-1; })(),
+                  borderColor:'#444', borderDash:[6,4], borderWidth:2, label:{ display:true, content:`median ${fmt(med,2)}`, position:'end', backgroundColor:'rgba(0,0,0,.08)' }
+                }
+              }
+            },
+            tooltip:{ callbacks:{
+              afterBody:(ctx)=>{
+                const i = ctx[0].dataIndex;
+                const lo = bins[i]; const hi = bins[i+1];
+                return [`bin: ${fmt(lo,2)}–${fmt(hi,2)}`, `within mean±SD: ${ (lo<=mean+std && hi>=mean-std) ? 'yes':'no' }`];
+              }
+            }}
+          },
+          scales:{
+            x:{ title:{ display:true, text:'Velocity' }, ticks:{ maxRotation:0, autoSkip:true } },
+            y:{ title:{ display:true, text:'Count' }, beginAtZero:true, precision:0 }
+          }
+        }
+      });
+    }
+
+    // ---------- PROCESS ----------
+    document.getElementById("apply-style").onclick = async () => {
+      const key = document.getElementById("raster_layer").value; if (!key) { alert("Select a raster layer"); return; }
+      const info = rasterRegistry[key]; if (!info) { alert("Layer missing"); return; }
+      const pal  = document.getElementById("palette").value;
+      await renderRasterWithPalette(info.runId, info.kind, pal, info);
+      updateLegendsUI();
     };
 
     document.getElementById("process").onclick = async () => {
@@ -523,12 +636,25 @@
       fd.append("date_field", document.getElementById("date_field").value || "date");
       fd.append("id_field", document.getElementById("id_field").value || "id");
       fd.append("weight_field", document.getElementById("weight_field").value || "weight");
-      fd.append("case_field", document.getElementById("case_field").value || "cases");
+      // kriging params
+      fd.append("kriging_model", document.getElementById("kriging_model").value);
+      fd.append("variogram_model", document.getElementById("variogram_model").value);
+      const vs = document.getElementById("var_sill").value.trim(); if (vs!=="") fd.append("var_sill", vs);
+      const vr = document.getElementById("var_range").value.trim(); if (vr!=="") fd.append("var_range", vr);
+      const vn = document.getElementById("var_nugget").value.trim(); if (vn!=="") fd.append("var_nugget", vn);
+      fd.append("nlags", document.getElementById("nlags").value || 6);
+      fd.append("weight", document.getElementById("use_weights").checked ? "true" : "false");
+      const drift = document.getElementById("drift_terms").value.trim();
+      if (drift) fd.append("drift_terms", drift);
 
       const r = await fetch("/run", { method:"POST", body:fd });
       const js = await r.json();
-      currentRun = js.run_id;
 
+      runCount += 1;
+      currentRunId = js.run_id;
+      const suffix = `_${runCount}`;
+
+      // downloads
       const ul = document.getElementById("downloads");
       ul.innerHTML="";
       const nice = {
@@ -536,7 +662,7 @@
         contours:"Iso-contours (GPKG)", ellipse:"Standard deviation ellipse (GPKG)",
         selected_points:"Selected points (GPKG)", all_points:"All points (GPKG)", grid:"Grid (GPKG)",
         selected_points_geojson:"Selected points (GeoJSON)", all_points_geojson:"All points (GeoJSON)",
-        ellipse_geojson:"Ellipse (GeoJSON)", contours_geojson:"Contours (GeoJSON)"
+        ellipse_geojson:"Ellipse (GeoJSON)", contours_geojson:"Contours (GeoJSON)", bundle_zip:"Full bundle (ZIP)"
       };
       for (const [k,v] of Object.entries(js.urls)) {
         if (v) {
@@ -545,20 +671,95 @@
           ul.appendChild(li);
         }
       }
+      // highlight single zip
+      const bz = js.urls.bundle_zip;
+      const chipWrap = document.getElementById("bundle-chip");
+      chipWrap.style.display = bz ? "" : "none";
+      chipWrap.innerHTML = bz ? `<a class="btn btn-primary" href="${bz}" target="_blank" rel="noopener">Download all outputs as ZIP</a>` : "";
 
+      // velocity stats
       renderVelocitySummary(js?.stats?.velocity);
 
-      clearRasters(); clearVectors();
-      if (js.images?.kriging)  addImage("kriging",  js.images.kriging.url,  js.images.kriging.bounds);
-      if (js.images?.slope)    addImage("slope",    js.images.slope.url,    js.images.slope.bounds);
-      if (js.images?.velocity) addImage("velocity", js.images.velocity.url, js.images.velocity.bounds);
+      // rasters
+      const names = {kriging:`Kriging surface ${suffix}`, slope:`Slope (deg) ${suffix}`, velocity:`Velocity (1/deg) ${suffix}`};
+      if (js.images?.kriging)  addImage(js.run_id, "kriging",  js.images.kriging.url,  js.images.kriging.bounds,  names.kriging);
+      if (js.images?.slope)    addImage(js.run_id, "slope",    js.images.slope.url,    js.images.slope.bounds,    names.slope);
+      if (js.images?.velocity) addImage(js.run_id, "velocity", js.images.velocity.url, js.images.velocity.bounds, names.velocity);
 
-      if (js.urls.contours_geojson)  await addGeoJSON("contours", js.urls.contours_geojson, "contours");
-      if (js.urls.ellipse_geojson)   await addGeoJSON("ellipse",  js.urls.ellipse_geojson,  "ellipse");
-      if (js.urls.all_points_geojson)await addGeoJSON("CSV points", js.urls.all_points_geojson, "points");
+      // vectors: ellipse, contours
+      if (js.urls.contours_geojson) {
+        const gj = await fetchJSON(js.urls.contours_geojson);
+        const layer = L.geoJSON(gj, {pane:'vectors', style:{color:"#0066cc", weight:1.5, opacity:0.9}}).addTo(map);
+        const nm = `Iso-contours ${suffix}`;
+        overlays[nm] = layer; layerControl.addOverlay(layer, nm);
+      }
+      if (js.urls.ellipse_geojson) {
+        const gj = await fetchJSON(js.urls.ellipse_geojson);
+        const layer = L.geoJSON(gj, {pane:'vectors', style:{color:"#aa8800", weight:2, fillColor:"#ffdd77", fillOpacity:0.25}}).addTo(map);
+        const nm = `Std. deviation ellipse ${suffix}`;
+        overlays[nm] = layer; layerControl.addOverlay(layer, nm);
+      }
 
-      drawLegendFromInputs();
+      // points: ONLY the user CSV points for the latest run, tied to time slider
+      if (pointsLayer) { try{ layerControl.removeLayer(pointsLayer); map.removeLayer(pointsLayer); }catch{} pointsLayer = null; }
+      pointsAllFeatures = [];
+      if (js.urls.all_points_geojson){
+        const gj = await fetchJSON(js.urls.all_points_geojson);
+        pointsAllFeatures = Array.isArray(gj.features) ? gj.features : [];
+        // detect date key
+        const sample = pointsAllFeatures.find(f=>f && f.properties);
+        dateKeyGlobal = "DATE_ISO"; // backend wrote this
+        if (sample && !('DATE_ISO' in (sample.properties||{}))) {
+          // fallback to backend meta
+          dateKeyGlobal = js?.meta?.date_field || Object.keys(sample.properties)[0];
+        }
+        // build timeline
+        const dates = pointsAllFeatures.map(f => toISODate(f?.properties?.DATE_ISO || f?.properties?.[dateKeyGlobal])).filter(Boolean);
+        const uq = Array.from(new Set(dates)).sort();
+        timeDates = uq;
+        timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
+        const slider = document.getElementById("time");
+        const tstart = document.getElementById("time-start");
+        const tcur = document.getElementById("time-current");
+        if (!uq.length){
+          slider.disabled = true; slider.min=0; slider.max=0; slider.value=0; tstart.textContent="—"; tcur.textContent="—";
+        } else {
+          slider.min=0; slider.max=uq.length-1; slider.value=uq.length-1; slider.disabled=false;
+          tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
+        }
+        // create and add layer
+        pointsLayer = L.geoJSON({type:"FeatureCollection", features:[]}, {
+          pane:'vectors',
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
+        }).addTo(map);
+        const pName = `CSV points ${suffix}`;
+        overlays[pName] = pointsLayer; layerControl.addOverlay(pointsLayer, pName);
+        renderPointsAt(parseInt(slider.value));
+      }
+
+      // expand layers UI
+      layerControl.expand();
+
+      // log run
+      const lg = document.getElementById("run-log");
+      const card = document.createElement('div');
+      card.className = 'ctrl';
+      const p = js.meta?.params || {};
+      const npts = pointsAllFeatures.length;
+      const t0 = timeDates[0] || '—', t1 = timeDates[timeDates.length-1] || '—';
+      card.innerHTML = `<strong>Run ${runCount}</strong><br>
+        Grid: ${p.grid_m} m · Cell: ${p.cell_m} m · Contour: ${p.contour}<br>
+        Kriging: ${p.kriging_model}/${p.variogram_model} · lags=${p.nlags} · weighted=${p.weight} · drift=[${(p.drift_terms||[]).join(', ')}]<br>
+        Points: ${npts} · Date range: ${t0} → ${t1}`;
+      lg.prepend(card);
     };
+
+    // ---------- hook raster select -> palette select sync ----------
+    document.getElementById("raster_layer").addEventListener('change', (e)=>{
+      const info = rasterRegistry[e.target.value];
+      if (!info) return;
+      document.getElementById("palette").value = info.palette || 'gray';
+    });
   </script>
 </body>
 </html>

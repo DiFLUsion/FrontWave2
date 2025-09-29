@@ -1,32 +1,33 @@
 # app/frontwave.py
 # -*- coding: utf-8 -*-
-import os, math, warnings, sys
+import os, math, warnings, sys, zipfile
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, LineString
 from pykrige.ok import OrdinaryKriging
+from pykrige.uk import UniversalKriging
 import rasterio
 from rasterio.transform import from_origin
 from rasterio.crs import CRS as RCRS
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from skimage import measure
 
+# --- PROJ/GDAL env for hosted environments ---
 CONDA_PREFIX = os.environ.get("CONDA_PREFIX", sys.prefix)
 proj_dir = os.path.join(CONDA_PREFIX, "Library", "share", "proj")
 gdal_dir = os.path.join(CONDA_PREFIX, "Library", "share", "gdal")
 bin_dir  = os.path.join(CONDA_PREFIX, "Library", "bin")
-
 os.environ.setdefault("PROJ_LIB", proj_dir)
 os.environ.setdefault("GDAL_DATA", gdal_dir)
 os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH","")
-
 try:
     from pyproj import datadir as _pdd
     os.environ.setdefault("PROJ_LIB", _pdd.get_data_dir())
 except Exception:
     pass
 
+# --- helpers ---
 def guess_utm_epsg(lon, lat):
     zone = int((lon + 180) / 6) + 1
     south = lat < 0
@@ -49,7 +50,7 @@ def _pick_column(df, candidates, required=True):
 
 def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
                          date_field="date", id_field="id",
-                         weight_field="weight", case_field="cases",
+                         weight_field="weight",
                          sep=';', date_format=None, dayfirst=True):
     df = pd.read_csv(csv_path, sep=sep)
 
@@ -58,7 +59,6 @@ def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
     date_field = _pick_column(df, [date_field, "fecha","date","datetime","fecha_hora","fec"], required=True)
     id_field   = _pick_column(df, [id_field, "id","identificador","codigo"], required=False)
     weight_field = _pick_column(df, [weight_field, "peso","w","weight"], required=False)
-    case_field = _pick_column(df, [case_field, "casos","n","count","cases"], required=False)
 
     ref = pd.Timestamp("1901-01-01")
     if date_format:
@@ -73,11 +73,14 @@ def read_points_from_csv(csv_path, lon_field="lon", lat_field="lat",
 
     df = df.loc[~dt.isna()].copy()
     df["N1"] = (dt.loc[~dt.isna()] - ref).dt.days.astype(int)
-    df["DATE_ISO"] = pd.to_datetime(df[date_field], errors="coerce").dt.strftime("%Y-%m-%d")
-    df["DATE_ISO"] = df["DATE_ISO"].fillna("")
+    df["DATE_ISO"] = pd.to_datetime(df[date_field], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
+    if weight_field and weight_field in df.columns:
+        df["_WEIGHT"] = pd.to_numeric(df[weight_field], errors="coerce").fillna(1.0).astype(float)
+    else:
+        df["_WEIGHT"] = 1.0
 
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df[lon_field], df[lat_field]), crs="EPSG:4326")
-    meta = {"date": date_field, "id": id_field, "weight": weight_field, "case": case_field}
+    meta = {"date": date_field, "id": id_field, "weight": "_WEIGHT"}
     return gdf, meta
 
 def make_square_grid(bounds, cell_size):
@@ -102,7 +105,11 @@ def select_earliest_points_by_cell(points_m, cell_size):
     selected["NUM0"] = selected["MIN_N1"] - min_global
     return selected, grid
 
-def run_ok_kriging(selected_m, value_field="NUM0", cell_size=1000.0, variogram_model="spherical"):
+def run_kriging(selected_m, value_field="NUM0", cell_size=1000.0,
+                kriging_model="ordinary",
+                variogram_model="spherical",
+                variogram_params=None,  # list/tuple [sill, range, nugget]
+                nlags=6, weight=False, drift_terms=None):
     xs = selected_m.geometry.x.values
     ys = selected_m.geometry.y.values
     zs = selected_m[value_field].values.astype(float)
@@ -111,10 +118,35 @@ def run_ok_kriging(selected_m, value_field="NUM0", cell_size=1000.0, variogram_m
     ny = int(math.ceil((ymax - ymin) / cell_size)) + 1
     gridx = np.linspace(xmin, xmin + cell_size * (nx - 1), nx)
     gridy = np.linspace(ymin, ymin + cell_size * (ny - 1), ny)
+
+    vparams = None
+    if variogram_params and len(variogram_params) == 3:
+        # Expect [sill, range, nugget]
+        vparams = [float(variogram_params[0]), float(variogram_params[1]), float(variogram_params[2])]
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        OK = OrdinaryKriging(xs, ys, zs, variogram_model=variogram_model, enable_plotting=False, verbose=False)
-        zgrid, _ = OK.execute("grid", gridx, gridy)
+        if str(kriging_model).lower().startswith("u"):  # universal
+            uk = UniversalKriging(
+                xs, ys, zs,
+                variogram_model=variogram_model,
+                variogram_parameters=vparams,
+                nlags=int(nlags),
+                weight=bool(weight),
+                drift_terms=(drift_terms if drift_terms else ["regional_linear"])
+            )
+            zgrid, _ = uk.execute("grid", gridx, gridy)
+        else:
+            ok = OrdinaryKriging(
+                xs, ys, zs,
+                variogram_model=variogram_model,
+                variogram_parameters=vparams,
+                nlags=int(nlags),
+                weight=bool(weight),
+                enable_plotting=False,
+                verbose=False
+            )
+            zgrid, _ = ok.execute("grid", gridx, gridy)
     return gridx, gridy, np.asarray(zgrid)
 
 def save_geotiff_utm(path, gridx, gridy, z, epsg_code):
@@ -177,7 +209,7 @@ def velocity_from_slope(slope_deg):
 
 def standard_deviational_ellipse(points_m, weight_field=None, group_field=None):
     df = points_m.copy()
-    df["_w"] = 1.0 if weight_field is None else df[weight_field].astype(float).fillna(0.0)
+    df["_w"] = 1.0 if weight_field is None else pd.to_numeric(df[weight_field], errors="coerce").fillna(0.0).astype(float)
     def ellipse_for_group(gg):
         x = gg.geometry.x.values; y = gg.geometry.y.values; w = gg["_w"].values
         W = w.sum()
@@ -187,7 +219,7 @@ def standard_deviational_ellipse(points_m, weight_field=None, group_field=None):
         Sxx = np.average(x0*x0, weights=w); Syy = np.average(y0*y0, weights=w); Sxy = np.average(x0*y0, weights=w)
         cov = np.array([[Sxx, Sxy],[Sxy, Syy]])
         vals, vecs = np.linalg.eigh(cov)
-        a = math.sqrt(vals[1]); b = math.sqrt(vals[0])
+        a = math.sqrt(max(vals[1], 0)); b = math.sqrt(max(vals[0], 0))
         theta = math.atan2(vecs[1,1], vecs[0,1])
         t = np.linspace(0, 2*np.pi, 256)
         ex, ey = a*np.cos(t), b*np.sin(t)
@@ -204,21 +236,35 @@ def standard_deviational_ellipse(points_m, weight_field=None, group_field=None):
     poly = ellipse_for_group(df)
     return gpd.GeoDataFrame([{"geometry": poly}], geometry="geometry", crs=df.crs) if poly else gpd.GeoDataFrame(geometry=[], crs=df.crs)
 
+def build_zip(out_folder, zip_path):
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(out_folder):
+            for fn in files:
+                if fn == os.path.basename(zip_path):  # skip self
+                    continue
+                fp = os.path.join(root, fn)
+                arc = os.path.relpath(fp, out_folder)
+                zf.write(fp, arc)
+
 def run_frontwave(csv_path, out_folder,
                   lon_field="lon", lat_field="lat", date_field="date", id_field="id",
-                  weight_field="weight", case_field="cases",
+                  weight_field="weight",
                   grid_cell_m=12000.0, krige_cell_m=1200.0, contour_interval=30.0,
-                  sep=';', date_format=None, dayfirst=True):
+                  sep=';', date_format=None, dayfirst=True,
+                  # kriging params
+                  kriging_model="ordinary",
+                  variogram_model="spherical",
+                  var_sill=None, var_range=None, var_nugget=None,
+                  nlags=6, weight=False, drift_terms=None):
     os.makedirs(out_folder, exist_ok=True)
 
-    # ALL points WGS84 with DATE_ISO
+    # ALL points WGS84 with DATE_ISO and _WEIGHT
     pts_wgs84, meta = read_points_from_csv(
         csv_path, lon_field, lat_field, date_field, id_field,
-        weight_field, case_field, sep=sep,
-        date_format=date_format, dayfirst=dayfirst
+        weight_field, sep=sep, date_format=date_format, dayfirst=dayfirst
     )
 
-    # Save ALL points to GPKG and GeoJSON (WGS84)
+    # Export ALL points
     all_points_gpkg = os.path.join(out_folder, "all_points.gpkg")
     pts_wgs84.to_file(all_points_gpkg, layer="all_pts", driver="GPKG")
     all_points_geojson = os.path.join(out_folder, "all_points.geojson")
@@ -228,22 +274,18 @@ def run_frontwave(csv_path, out_folder,
     pts_m, epsg = to_metric_crs(pts_wgs84)
     selected_m, grid = select_earliest_points_by_cell(pts_m, grid_cell_m)
 
-    # Add DATE_ISO to selected subset and export both GPKG and GeoJSON (WGS84)
-    dcol = meta["date"]
-    try:
-        dt_sel = pd.to_datetime(selected_m[dcol], errors="coerce")
-        selected_m["DATE_ISO"] = dt_sel.dt.strftime("%Y-%m-%d").fillna("")
-    except Exception:
-        selected_m["DATE_ISO"] = ""
+    # Kriging
+    vparams = None
+    if all(v is not None for v in [var_sill, var_range, var_nugget]):
+        vparams = [float(var_sill), float(var_range), float(var_nugget)]
+    gx, gy, z = run_kriging(
+        selected_m, value_field="NUM0", cell_size=krige_cell_m,
+        kriging_model=kriging_model, variogram_model=variogram_model,
+        variogram_params=vparams, nlags=int(nlags), weight=bool(weight),
+        drift_terms=drift_terms
+    )
 
-    selected_gpkg = os.path.join(out_folder, "selected_points.gpkg")
-    selected_m.to_file(selected_gpkg, layer="selected_pts", driver="GPKG")
-    selected_points_geojson = os.path.join(out_folder, "selected_points.geojson")
-    selected_m.to_crs("EPSG:4326").to_file(selected_points_geojson, driver="GeoJSON")
-
-    # Kriging and rasters
-    gx, gy, z = run_ok_kriging(selected_m, value_field="NUM0", cell_size=krige_cell_m, variogram_model="spherical")
-
+    # Rasters: UTM + WGS84
     kriging_utm = os.path.join(out_folder, "kriging_utm.tif")
     save_geotiff_utm(kriging_utm, gx, gy, z, epsg)
     kriging_tif = os.path.join(out_folder, "kriging.tif")
@@ -261,7 +303,7 @@ def run_frontwave(csv_path, out_folder,
     velocity_tif = os.path.join(out_folder, "velocity.tif")
     reproject_to_wgs84(velocity_utm, velocity_tif)
 
-    # Vectors: contours and ellipse → GPKG + GeoJSON (WGS84)
+    # Vectors
     gcont = contours_from_grid(gx, gy, z, interval=contour_interval).set_crs(epsg)
     contours_gpkg = os.path.join(out_folder, "contours.gpkg")
     if len(gcont): gcont.to_file(contours_gpkg, layer="contours", driver="GPKG")
@@ -274,8 +316,14 @@ def run_frontwave(csv_path, out_folder,
     ellipse_geojson = os.path.join(out_folder, "ellipse.geojson")
     if len(ellipse): ellipse.to_crs("EPSG:4326").to_file(ellipse_geojson, driver="GeoJSON")
 
-    grid_gpkg = os.path.join(out_folder, "grid.gpkg")
-    grid.to_file(grid_gpkg, layer="grid", driver="GPKG")
+    selected_gpkg = os.path.join(out_folder, "selected_points.gpkg")
+    selected_m.to_file(selected_gpkg, layer="selected_pts", driver="GPKG")
+    selected_points_geojson = os.path.join(out_folder, "selected_points.geojson")
+    selected_m.to_crs("EPSG:4326").to_file(selected_points_geojson, driver="GeoJSON")
+
+    # ZIP bundle
+    zip_path = os.path.join(out_folder, "frontwave_outputs.zip")
+    build_zip(out_folder, zip_path)
 
     return {
         "kriging": kriging_tif,
@@ -289,7 +337,8 @@ def run_frontwave(csv_path, out_folder,
         "selected_points_geojson": selected_points_geojson if os.path.exists(selected_points_geojson) else None,
         "all_points": all_points_gpkg,
         "all_points_geojson": all_points_geojson if os.path.exists(all_points_geojson) else None,
-        "grid": grid_gpkg,
+        "grid": os.path.join(out_folder, "grid.gpkg"),
         "crs": epsg,
-        "date_field": dcol
+        "date_field": meta["date"],
+        "zip": zip_path
     }

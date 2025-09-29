@@ -1,5 +1,5 @@
 # app/main.py
-import os, math, uuid
+import os, math, uuid, mimetypes
 import numpy as np
 import rasterio
 from fastapi import FastAPI, UploadFile, Form, Query
@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+
+mimetypes.add_type('application/geo+json', '.geojson')
+mimetypes.add_type('application/json', '.geojson')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
@@ -56,7 +59,7 @@ def _raster_stats(path: str) -> dict:
     vmin = float(np.min(data)); vmax = float(np.max(data)); mean = float(np.mean(data))
     std = float(np.std(data, ddof=1)) if n_valid > 1 else float("nan")
     se = (std / math.sqrt(n_valid)) if n_valid > 1 else float("nan")
-    counts, edges = np.histogram(data, bins=20)
+    counts, edges = np.histogram(data, bins=24)
     return {
         "count": n_valid, "nodata_count": n_nodata,
         "min": vmin, "p05": float(q[0]), "p25": float(q[1]), "p50": float(q[2]), "p75": float(q[3]), "p95": float(q[4]),
@@ -67,13 +70,30 @@ def _raster_stats(path: str) -> dict:
         "hist_bins": edges.tolist(), "hist_counts": counts.tolist()
     }
 
+# color palettes
 def _palette_stops(name: str):
+    name = (name or "").lower()
     if name == "viridis":
-        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array(
-            [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]], dtype=float)
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]], dtype=float)
+    if name == "plasma":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[13,8,135],[126,3,168],[203,71,119],[248,149,64],[240,249,33]], dtype=float)
+    if name == "magma":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[0,0,4],[84,15,109],[187,55,84],[249,142,9],[252,255,164]], dtype=float)
+    if name == "inferno":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[0,0,3],[87,15,109],[187,55,84],[249,142,9],[252,255,164]], dtype=float)
+    if name == "cividis":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[0,32,77],[44,81,96],[90,123,101],[160,178,86],[255,233,69]], dtype=float)
+    if name == "terrain":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[0,120,0],[173,221,142],[255,255,191],[253,174,97],[215,25,28]], dtype=float)
+    if name == "turbo":
+        return np.array([0, .25, .5, .75, 1.0]), np.array([[48,18,59],[31,154,170],[52,209,91],[236,200,52],[220,47,2]], dtype=float)
+    if name == "coolwarm":
+        return np.array([0, .5, 1.0]), np.array([[59,76,192],[221,221,221],[180,4,38]], dtype=float)
     if name == "heat":
-        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array(
-            [[0,0,128],[0,255,255],[255,255,0],[255,128,0],[128,0,0]], dtype=float)
+        return np.array([0.0, 0.25, 0.5, 0.75, 1.0]), np.array([[0,0,128],[0,255,255],[255,255,0],[255,128,0],[128,0,0]], dtype=float)
+    if name == "gray":
+        return np.array([0.0,1.0]), np.array([[0,0,0],[255,255,255]], dtype=float)
+    # default
     return np.array([0.0,1.0]), np.array([[0,0,0],[255,255,255]], dtype=float)
 
 def _apply_palette_01(x01: np.ndarray, palette: str):
@@ -89,7 +109,7 @@ def _apply_palette_01(x01: np.ndarray, palette: str):
     b = ((1 - a) * c0[..., 2] + a * c1[..., 2]).astype(np.uint8)
     return r, g, b
 
-def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, palette: str):
+def _render_png_from_tif(src_tif: str, dst_png: str, palette: str):
     with rasterio.open(src_tif) as src:
         arr = src.read(1, masked=True)
         bounds = src.bounds
@@ -99,8 +119,9 @@ def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, p
         h, w = data.shape
         rgba = np.zeros((4, h, w), dtype=np.uint8)
     else:
-        lo = np.nanpercentile(data, pmin)
-        hi = np.nanpercentile(data, pmax)
+        # Auto stretch 2–98 percentiles internally
+        lo = np.nanpercentile(data, 2.0)
+        hi = np.nanpercentile(data, 98.0)
         if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
             lo = np.nanmin(data); hi = np.nanmax(data)
             if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
@@ -116,7 +137,7 @@ def _render_png_from_tif(src_tif: str, dst_png: str, pmin: float, pmax: float, p
     return [[bounds.bottom, bounds.left], [bounds.top, bounds.right]]
 
 def _quicklook_png(src_tif: str, dst_png: str):
-    return _render_png_from_tif(src_tif, dst_png, 2.0, 98.0, "gray")
+    return _render_png_from_tif(src_tif, dst_png, "gray")
 
 @app.post("/run")
 async def run_process(
@@ -130,7 +151,15 @@ async def run_process(
     date_field: str = Form("date"),
     id_field: str = Form("id"),
     weight_field: str = Form("weight"),
-    case_field: str = Form("cases"),
+    # kriging params
+    kriging_model: str = Form("ordinary"),
+    variogram_model: str = Form("spherical"),
+    var_sill: float | None = Form(None),
+    var_range: float | None = Form(None),
+    var_nugget: float | None = Form(None),
+    nlags: int = Form(6),
+    weight: bool = Form(False),
+    drift_terms: str | None = Form(None),
 ):
     if sep.lower() in ("\\t", "tab", "tabs"):
         sep = "\t"
@@ -143,13 +172,18 @@ async def run_process(
     out_dir = os.path.join(DATA_DIR, run_id)
     os.makedirs(out_dir, exist_ok=True)
 
+    drift = [t.strip() for t in (drift_terms or "").split(",") if t.strip()] or None
+
     res = run_frontwave(
         csv_path=tmp_csv,
         out_folder=out_dir,
         lon_field=lon_field, lat_field=lat_field, date_field=date_field,
-        id_field=id_field, weight_field=weight_field, case_field=case_field,
+        id_field=id_field, weight_field=weight_field,
         grid_cell_m=float(grid), krige_cell_m=float(cell), contour_interval=float(contour),
-        sep=sep, dayfirst=True
+        sep=sep, dayfirst=True,
+        kriging_model=kriging_model, variogram_model=variogram_model,
+        var_sill=var_sill, var_range=var_range, var_nugget=var_nugget,
+        nlags=nlags, weight=weight, drift_terms=drift
     )
 
     def to_url(p):
@@ -179,15 +213,24 @@ async def run_process(
         "selected_points": to_url(res.get("selected_points")),
         "all_points": to_url(res.get("all_points")),
         "grid": to_url(res.get("grid")),
-        # direct GeoJSON exports (guaranteed WGS84)
         "selected_points_geojson": to_url(res.get("selected_points_geojson")),
         "all_points_geojson": to_url(res.get("all_points_geojson")),
         "ellipse_geojson": to_url(res.get("ellipse_geojson")),
         "contours_geojson": to_url(res.get("contours_geojson")),
+        "bundle_zip": to_url(res.get("zip")),
     }
 
     stats = {"velocity": _raster_stats(res["velocity"])} if res.get("velocity") else {"velocity": {"count": 0, "nodata_count": None}}
-    meta = {"date_field": res.get("date_field", "date")}
+
+    meta = {
+        "date_field": res.get("date_field", "date"),
+        "params": {
+            "grid_m": grid, "cell_m": cell, "contour": contour,
+            "kriging_model": kriging_model, "variogram_model": variogram_model,
+            "var_sill": var_sill, "var_range": var_range, "var_nugget": var_nugget,
+            "nlags": nlags, "weight": weight, "drift_terms": drift or []
+        }
+    }
 
     return JSONResponse(content={"run_id": run_id, "urls": urls, "images": images, "stats": stats, "meta": meta})
 
@@ -195,18 +238,14 @@ async def run_process(
 def render_raster(
     kind: str = Query(..., pattern="^(kriging|slope|velocity)$"),
     run_id: str = Query(...),
-    pmin: float = Query(2.0, ge=0.0, le=100.0),
-    pmax: float = Query(98.0, ge=0.0, le=100.0),
     palette: str = Query("gray"),
 ):
     tif_map = {"kriging": "kriging.tif", "slope": "slope.tif", "velocity": "velocity.tif"}
     src_tif = os.path.join(DATA_DIR, run_id, tif_map[kind])
     if not os.path.exists(src_tif):
         return JSONResponse({"error": "raster not found"}, status_code=404)
-    if pmax <= pmin:
-        pmin, pmax = 2.0, 98.0
-    out_png = os.path.join(DATA_DIR, run_id, f"{kind}_{palette}_{int(pmin)}_{int(pmax)}.png")
-    bounds = _render_png_from_tif(src_tif, out_png, pmin, pmax, palette)
+    out_png = os.path.join(DATA_DIR, run_id, f"{kind}_{palette}.png")
+    bounds = _render_png_from_tif(src_tif, out_png, palette)
     rel = os.path.relpath(out_png, DATA_DIR).replace("\\", "/")
     return JSONResponse({"url": f"/data/{rel}?v={uuid.uuid4().hex[:6]}", "bounds": bounds})
 
