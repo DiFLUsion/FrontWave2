@@ -15,7 +15,7 @@
     header h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
     header p { margin:0; color:#b7b7b7; font-size:.9rem }
 
-    section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff }
+    section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff; position:relative }
     h2 { margin:.25rem 0 .75rem; font-size:1.2rem }
     .row { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center }
     .col { display:flex; flex-direction:column; gap:.5rem }
@@ -28,7 +28,8 @@
     .btn-primary { background:var(--primary); color:var(--ink); border-color:var(--primary) }
     .btn:disabled { opacity:.6; cursor:not-allowed }
 
-    #map { height:560px; margin:1rem 0; border:1px solid #ddd; border-radius:10px }
+    #map { height:560px; margin:0; border:1px solid #ddd; border-radius:10px }
+    .map-wrap { position:relative; margin-top:.75rem }
 
     .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd; border-radius:8px; }
     table { border-collapse:collapse; width:100% }
@@ -54,10 +55,10 @@
     .grow { flex:1 1 280px }
     .kpanel { border:1px dashed #ccc; padding:.75rem; border-radius:8px }
 
-    #toolbox-toggle { position:fixed; right:10px; top:50%; transform:translateY(-50%); z-index:1000; padding:.5rem .75rem; border-radius:10px; border:1px solid #bbb; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.08) }
-    #toolbox { position:fixed; right:0; top:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid #cfd8ea; box-shadow: -6px 0 16px rgba(0,0,0,.08); z-index:999; transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column }
+    /* Toolbox embedded in Step 2 */
+    #toolbox { position:absolute; right:0; top:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid #cfd8ea; box-shadow: -6px 0 16px rgba(0,0,0,.08); z-index:900; transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column; border-top-right-radius:10px; border-bottom-right-radius:10px }
     #toolbox.open { transform:translateX(0) }
-    .tb-head { display:flex; align-items:center; justify-content:space-between; padding:.75rem .9rem; border-bottom:1px solid #dfe6f5; background:#fff }
+    .tb-head { display:flex; align-items:center; justify-content:space-between; padding:.6rem .8rem; border-bottom:1px solid #dfe6f5; background:#fff }
     .tb-body { padding:.8rem .9rem; overflow:auto }
     .tb-sec { background:#fff; border:1px solid #dfe6f5; border-radius:10px; padding:.7rem .75rem; margin-bottom:.75rem }
     .tb-sec h4 { margin:.1rem 0 .5rem; font-size:1rem }
@@ -76,6 +77,7 @@
     <p>1) Load CSV → 2) Set fields and kriging params → 3) Process → 4) Map, legends, and downloads</p>
   </header>
 
+  <!-- Step 1 -->
   <section class="card">
     <h2>Step 1 · Prepare input</h2>
 
@@ -167,18 +169,105 @@
     </div>
   </section>
 
-  <section class="card">
+  <!-- Step 2 -->
+  <section class="card" id="map-card">
     <h2>Step 2 · Map</h2>
+
+    <!-- Controls row with Tools button INSIDE step 2 -->
     <div class="row" style="align-items:center">
       <label>Map height
         <input type="range" id="map_h" min="360" max="1000" step="20" value="560">
       </label>
       <button id="map_max" class="btn">Maximize</button>
-      <span class="muted">Open the right “Tools” tab to style layers and control time.</span>
+      <button id="toolbox-toggle" class="btn">Tools</button>
+      <span class="muted">Use tools to style layers and export map.</span>
     </div>
-    <div id="map"></div>
+
+    <!-- Visibility checkboxes INSIDE step 2, OUTSIDE map -->
+    <div class="row" style="align-items:center; margin:.25rem 0">
+      <label><input type="checkbox" id="show_layerctl" checked> Show layer control</label>
+      <label><input type="checkbox" id="show_legend" checked> Show legend</label>
+    </div>
+
+    <!-- Time slider ALWAYS visible in step 2 -->
+    <div class="tb-sec tb-subtle" style="margin:.5rem 0">
+      <h4 style="margin:.1rem 0 .4rem">Time control</h4>
+      <div class="timebar">
+        <div class="time-range">Range: <span id="time-start">—</span> → <span id="time-end">—</span></div>
+        <div class="time-current">Current: <span id="time-current">—</span></div>
+      </div>
+      <div class="row" style="align-items:center; margin-top:.4rem">
+        <button id="play" class="btn">Play</button>
+        <button id="pause" class="btn">Pause</button>
+        <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
+        <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
+        <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+
+      <!-- Toolbox PANEL embedded in Step 2, slides over map to the right -->
+      <aside id="toolbox" aria-label="Widget manager">
+        <div class="tb-head">
+          <strong>Tools</strong>
+          <button id="toolbox-close" class="btn">Close</button>
+        </div>
+        <div class="tb-body">
+          <div class="tb-sec tb-subtle">
+            <h4>Layer symbology</h4>
+            <div class="tb-note">Raster and points are controlled independently.</div>
+            <div class="row" style="align-items:flex-end">
+              <label>Raster layer
+                <select id="raster_layer"></select>
+              </label>
+              <label>Palette
+                <select id="palette">
+                  <option>gray</option><option>viridis</option><option>plasma</option><option>magma</option>
+                  <option>inferno</option><option>cividis</option><option>terrain</option><option>turbo</option>
+                  <option>coolwarm</option><option>heat</option>
+                </select>
+              </label>
+              <label>Opacity
+                <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
+              </label>
+              <button id="apply-style" class="btn btn-primary">Render raster</button>
+            </div>
+          </div>
+
+          <div class="tb-sec">
+            <h4>Point symbology</h4>
+            <div class="row" style="align-items:flex-end">
+              <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
+              <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
+              <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
+              <label>Opacity <input type="range" id="pt_opacity" value="0.85" min="0.1" max="1" step="0.05" style="width:120px"></label>
+              <button id="apply-pts-style" class="btn">Apply</button>
+            </div>
+          </div>
+
+          <div class="tb-sec">
+            <h4>Map tools</h4>
+            <div class="row" style="align-items:center">
+              <button id="fit_btn" class="btn">Fit all</button>
+              <label>Lat <input type="number" step="any" id="go_lat" placeholder="lat" style="width:6.2rem"></label>
+              <label>Lon <input type="number" step="any" id="go_lon" placeholder="lon" style="width:6.2rem"></label>
+              <button id="go_btn" class="btn">Go</button>
+            </div>
+            <div class="row" style="align-items:center; margin-top:.4rem">
+              <button id="m_toggle" class="btn">Measure</button>
+              <button id="m_clear" class="btn">×</button>
+              <span id="m_len" class="muted">0 km</span>
+              <button id="map-save" class="btn">Save map PNG</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
   </section>
 
+  <!-- Step 3 -->
   <section class="card">
     <h2>Step 3 · Downloads</h2>
     <div class="chips" id="bundle-chip" style="display:none"></div>
@@ -188,6 +277,7 @@
     </details>
   </section>
 
+  <!-- Step 4 -->
   <section class="card" id="stats-card" style="display:none">
     <h2>Step 4 · Velocity summary</h2>
     <div class="panel">
@@ -227,87 +317,6 @@
     <h2>Execution log</h2>
     <div id="run-log" class="row" style="gap:.75rem"></div>
   </section>
-
-  <!-- Toolbox -->
-  <button id="toolbox-toggle" aria-controls="toolbox" aria-expanded="false">Tools</button>
-  <aside id="toolbox" class="closed" aria-label="Widget manager">
-    <div class="tb-head">
-      <strong>Tools</strong>
-      <button id="toolbox-close" class="btn">Close</button>
-    </div>
-    <div class="tb-body">
-      <div class="tb-sec tb-subtle">
-        <h4>Panels visibility</h4>
-        <div class="row">
-          <label><input type="checkbox" id="show_layerctl" checked> Show layer control</label>
-          <label><input type="checkbox" id="show_legend" checked> Show legend</label>
-        </div>
-      </div>
-
-      <div class="tb-sec tb-subtle">
-        <h4>Layer symbology</h4>
-        <div class="tb-note">Raster and points are controlled independently.</div>
-        <div class="row" style="align-items:flex-end">
-          <label>Raster layer
-            <select id="raster_layer"></select>
-          </label>
-          <label>Palette
-            <select id="palette">
-              <option>gray</option><option>viridis</option><option>plasma</option><option>magma</option>
-              <option>inferno</option><option>cividis</option><option>terrain</option><option>turbo</option>
-              <option>coolwarm</option><option>heat</option>
-            </select>
-          </label>
-          <label>Opacity
-            <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
-          </label>
-          <button id="apply-style" class="btn btn-primary">Render raster</button>
-        </div>
-      </div>
-
-      <div class="tb-sec">
-        <h4>Point symbology</h4>
-        <div class="row" style="align-items:flex-end">
-          <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
-          <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
-          <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
-          <label>Opacity <input type="range" id="pt_opacity" value="0.85" min="0.1" max="1" step="0.05" style="width:120px"></label>
-          <button id="apply-pts-style" class="btn">Apply</button>
-        </div>
-      </div>
-
-      <div class="tb-sec tb-subtle">
-        <h4>Time control</h4>
-        <div class="timebar">
-          <div class="time-range">Range: <span id="time-start">—</span> → <span id="time-end">—</span></div>
-          <div class="time-current">Current: <span id="time-current">—</span></div>
-        </div>
-        <div class="row" style="align-items:center; margin-top:.4rem">
-          <button id="play" class="btn">Play</button>
-          <button id="pause" class="btn">Pause</button>
-          <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
-          <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
-          <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
-        </div>
-      </div>
-
-      <div class="tb-sec">
-        <h4>Map tools</h4>
-        <div class="row" style="align-items:center">
-          <button id="fit_btn" class="btn">Fit all</button>
-          <label>Lat <input type="number" step="any" id="go_lat" placeholder="lat" style="width:6.2rem"></label>
-          <label>Lon <input type="number" step="any" id="go_lon" placeholder="lon" style="width:6.2rem"></label>
-          <button id="go_btn" class="btn">Go</button>
-        </div>
-        <div class="row" style="align-items:center; margin-top:.4rem">
-          <button id="m_toggle" class="btn">Measure</button>
-          <button id="m_clear" class="btn">×</button>
-          <span id="m_len" class="muted">0 km</span>
-          <button id="map-save" class="btn">Save map PNG</button>
-        </div>
-      </div>
-    </div>
-  </aside>
 
   <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -400,7 +409,7 @@
     });
     map.addControl(new LegCtl());
 
-    // Single toggle button to show/hide BOTH legend and layer control
+    // Map toggle button (kept)
     const PanelsToggle = L.Control.extend({
       options:{ position:'topleft' },
       onAdd: function(){
@@ -658,7 +667,6 @@
     let velChart = null;
     let velStats = null;
 
-    // Rebin histogram to an arbitrary number of bins by proportional overlap
     function rebinUniform(edges, counts, targetBins){
       const M = Math.max(0, edges.length-1);
       if (M === 0 || targetBins < 1) return {edges:[], counts:[]};
@@ -680,7 +688,6 @@
           }
         }
       }
-      // round to integers where sensible
       for (let j=0;j<newCounts.length;j++) newCounts[j] = +newCounts[j].toFixed(6);
       return {edges:newEdges, counts:newCounts};
     }
@@ -709,7 +716,6 @@
       const {edges, counts} = rebinUniform(baseEdges, baseCounts, bins);
       document.getElementById('bins_label').textContent = String(bins);
 
-      // Build labels from edges
       const labels = [];
       for (let i=0;i<bins;i++){ labels.push(`${fmt(edges[i],2)}–${fmt(edges[i+1],2)}`); }
 
@@ -717,7 +723,6 @@
       const ctx = document.getElementById("velChart").getContext("2d");
       if (velChart) velChart.destroy();
 
-      // Map a value to nearest bin index (for annotations)
       function idxForValue(x){
         if (!(isFinite(x))) return 0;
         if (x <= edges[0]) return 0;
@@ -778,7 +783,6 @@
       velChart = new Chart(ctx, cfg);
     }
 
-    // Histogram UI events
     document.getElementById('bins_slider').addEventListener('input', drawHistogram);
     document.getElementById('bins_minus').addEventListener('click', ()=>{
       const s = document.getElementById('bins_slider'); s.value = Math.max(parseInt(s.min), parseInt(s.value)-1); drawHistogram();
@@ -787,24 +791,6 @@
       const s = document.getElementById('bins_slider'); s.value = Math.min(parseInt(s.max), parseInt(s.value)+1); drawHistogram();
     });
     document.getElementById('show_cdf').addEventListener('change', drawHistogram);
-
-    // Copy/save histogram image
-    document.getElementById('hist-save').addEventListener('click', ()=>{
-      const c = document.getElementById('velChart');
-      const a = document.createElement('a');
-      a.download = 'velocity_histogram.png';
-      a.href = c.toDataURL('image/png');
-      a.click();
-    });
-    document.getElementById('hist-copy').addEventListener('click', async ()=>{
-      const c = document.getElementById('velChart');
-      if (!navigator.clipboard || !window.ClipboardItem){ alert('Clipboard not supported'); return; }
-      c.toBlob(async blob=>{
-        try {
-          await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
-        } catch(e){ alert('Copy failed'); }
-      });
-    });
 
     let measureMode=false, measureLine=null;
     function measureUpdate(){
@@ -962,19 +948,11 @@
       lg.prepend(card);
     };
 
-    document.getElementById("raster_layer").addEventListener('change', (e)=>{
-      const info = rasterRegistry[e.target.value];
-      if (!info) return;
-      document.getElementById("palette").value = info.palette || 'gray';
-    });
-
+    // Toolbox open/close inside Step 2
     const tb = document.getElementById('toolbox');
     const tbt = document.getElementById('toolbox-toggle');
     const tbc = document.getElementById('toolbox-close');
-    function setTb(open){
-      tb.classList.toggle('open', open);
-      tbt.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
+    function setTb(open){ tb.classList.toggle('open', open); }
     tbt.addEventListener('click', ()=> setTb(!tb.classList.contains('open')));
     tbc.addEventListener('click', ()=> setTb(false));
 
