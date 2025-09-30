@@ -228,6 +228,7 @@
     <div id="run-log" class="row" style="gap:.75rem"></div>
   </section>
 
+  <!-- Toolbox -->
   <button id="toolbox-toggle" aria-controls="toolbox" aria-expanded="false">Tools</button>
   <aside id="toolbox" class="closed" aria-label="Widget manager">
     <div class="tb-head">
@@ -308,6 +309,7 @@
     </div>
   </aside>
 
+  <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -385,16 +387,41 @@
 
     let ptStyle = { fillColor:"#7fa6ff", color:"#0b5fff", radius:4, fillOpacity:0.85, weight:1 };
 
+    // Legend (bottom-left)
     const LegCtl = L.Control.extend({
       options: { position:'bottomleft' },
       onAdd: function(){
         const div = L.DomUtil.create('div','leg-panel');
         div.id = 'legend-panel';
         div.innerHTML = '<strong>Legends</strong><div class="muted" style="font-size:.8rem">Click gradient to cycle palette</div><div id="leg-list"></div>';
+        L.DomEvent.disableClickPropagation(div);
         return div;
       }
     });
     map.addControl(new LegCtl());
+
+    // Single toggle button to show/hide BOTH legend and layers control
+    const PanelsToggle = L.Control.extend({
+      options:{ position:'topleft' },
+      onAdd: function(){
+        const container = L.DomUtil.create('div','leaflet-bar');
+        const a = L.DomUtil.create('a','',container);
+        a.href = '#';
+        a.title = 'Show/Hide legend and layer list';
+        a.innerHTML = '☰';
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(a,'click',L.DomEvent.stop)
+                  .on(a,'click',()=>{
+                    const lc = layerControl.getContainer();
+                    const leg = document.getElementById('legend-panel');
+                    const willShow = (lc?.style.display==='none' || leg?.style.display==='none');
+                    setLayerControlVisible(willShow);
+                    setLegendVisible(willShow);
+                  });
+        return container;
+      }
+    });
+    map.addControl(new PanelsToggle());
 
     function drawGrad(canvas, palette){
       const ctx = canvas.getContext('2d');
