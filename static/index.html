@@ -30,7 +30,7 @@
     .btn:disabled { opacity:.6; cursor:not-allowed }
 
     #map { height:560px; margin:1rem 0; border:1px solid #ddd; border-radius:10px }
-    .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd; border-radius:8px; display:none }
+    .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd; border-radius:8px; }
     table { border-collapse:collapse; width:100% }
     th, td { border:1px solid #eee; padding:4px 6px; font-size:12px; white-space:nowrap }
     th { background:#fafafa; position:sticky; top:0 }
@@ -45,10 +45,11 @@
     .leg-grad { display:block; width:100%; height:12px; image-rendering:pixelated; border-radius:3px; border:1px solid #ddd; cursor:pointer; margin:.35rem 0 }
     .leg-meta { font-size:.8rem; color:#444; display:flex; justify-content:space-between }
 
-    /* Layer control expanded */
+    /* Layer control expanded and titled */
     .leaflet-control-layers { max-height:550px; overflow:auto }
     .leaflet-control-layers-toggle { display:none }
     .leaflet-control-layers-expanded { display:block; padding:.5rem .5rem .25rem .5rem; background:#fff; border:1px solid rgba(0,0,0,.25) }
+    .layers-title { font-weight:700; margin:.35rem 0 .25rem; }
 
     /* Histogram */
     #vel-chart-wrap { width:820px; max-width:100%; height:380px; background:#fff; border:1px solid #ddd; border-radius:10px; padding:.5rem; }
@@ -62,6 +63,11 @@
     .ctrl-btn { background:#fff; border:1px solid #bbb; border-radius:8px; padding:.25rem .5rem; cursor:pointer }
     .ctrl-row { display:flex; gap:.35rem; align-items:center; flex-wrap:wrap }
     .sep { height:1px; background:#eee; margin:.35rem 0 }
+
+    /* time header */
+    .timebar { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap }
+    .time-current { font-size:1.15rem; font-weight:800; background:#eef3ff; border:1px solid #cfe0ff; padding:.2rem .5rem; border-radius:8px; }
+    .time-range { color:#333; font-weight:600 }
   </style>
 </head>
 <body>
@@ -88,10 +94,10 @@
             <option value="|">| (pipe)</option>
           </select>
         </label>
-        <label><input type="checkbox" id="toggle-preview"> Show CSV preview</label>
         <button id="preview" class="btn">Preview</button>
+        <button id="close-preview" class="btn">Close preview</button>
       </div>
-      <div class="table-wrap" id="preview-wrap">
+      <div class="table-wrap" id="preview-wrap" style="display:none">
         <table id="preview-table"></table>
       </div>
       <div class="chips" id="preview-info" style="display:none"></div>
@@ -107,7 +113,7 @@
         <label>Latitude field (Y)
           <select id="lat_field"></select>
         </label>
-        <label>Date/time field
+        <label>Date field
           <select id="date_field"></select>
         </label>
         <label>Identifier field
@@ -187,6 +193,7 @@
         <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
       </label>
       <button id="apply-style" class="btn btn-primary">Render raster</button>
+      <button id="map-save" class="btn">Save map PNG</button>
     </div>
 
     <div class="row" style="align-items:flex-end; margin-top:.5rem">
@@ -198,12 +205,12 @@
       <button id="apply-pts-style" class="btn">Apply</button>
     </div>
 
-    <div class="row" style="align-items:center; margin-top:.25rem">
-      <strong>Time</strong>
+    <div class="row timebar" style="align-items:center; margin-top:.25rem">
+      <div class="time-range">Range: <span id="time-start">—</span> → <span id="time-end">—</span></div>
+      <div class="time-current">Current: <span id="time-current">—</span></div>
       <button id="play" class="btn">Play</button>
       <button id="pause" class="btn">Pause</button>
       <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
-      <div><span id="time-start">—</span> → <strong id="time-current">—</strong></div>
       <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
       <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
     </div>
@@ -232,12 +239,24 @@
       <div class="chip">max: <span id="vel-max">—</span></div>
       <div class="chip">std: <span id="vel-std">—</span></div>
       <div class="chip">95% CI: <span id="vel-ci">—</span></div>
-      <label>Bins
-        <input type="range" id="bins_slider" min="6" max="48" step="1" value="24">
-      </label>
-      <button id="hist-copy" class="btn">Copy image</button>
-      <button id="hist-save" class="btn">Save PNG</button>
-      <label><input type="checkbox" id="show_cdf"> Show CDF</label>
+
+      <div class="row" style="align-items:center">
+        <strong>Bins:</strong>
+        <button id="bins_minus" class="btn">−</button>
+        <input type="range" id="bins_slider" min="6" max="48" step="1" value="24" list="bins_ticks">
+        <button id="bins_plus" class="btn">+</button>
+        <span id="bins_label" class="chip">24</span>
+        <label><input type="checkbox" id="show_cdf"> Show CDF</label>
+        <button id="hist-copy" class="btn">Copy image</button>
+        <button id="hist-save" class="btn">Save PNG</button>
+      </div>
+      <datalist id="bins_ticks">
+        <option value="6"></option>
+        <option value="12"></option>
+        <option value="24"></option>
+        <option value="36"></option>
+        <option value="48"></option>
+      </datalist>
     </div>
     <div id="vel-chart-wrap"><canvas id="velChart"></canvas></div>
     <p class="muted" style="margin-top:.5rem">
@@ -253,6 +272,7 @@
 
   <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
@@ -278,14 +298,27 @@
     map.createPane("rasters");  map.getPane("rasters").style.zIndex = 300;
     map.createPane("vectors");  map.getPane("vectors").style.zIndex = 650;
 
-    const baseOSM  = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM"}).addTo(map);
-    const baseLight = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO, OSM"});
-    const baseSat  = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    const baseOSM  = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {attribution:"© OSM", crossOrigin:true}).addTo(map);
+    const baseLight = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO, OSM", crossOrigin:true});
+    const baseSat  = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {crossOrigin:true});
     const base = {"OSM": baseOSM, "Carto Light": baseLight, "ESRI Imagery": baseSat};
 
     const overlays = {};
     const layerControl = L.control.layers(base, overlays, {collapsed:false}).addTo(map);
-    setTimeout(()=>layerControl.expand(), 50);
+
+    function titleLayerSections(){
+      const c = layerControl.getContainer();
+      if (!c) return;
+      const baseBox = c.querySelector('.leaflet-control-layers-base');
+      const overBox = c.querySelector('.leaflet-control-layers-overlays');
+      if (baseBox && !baseBox.previousSibling?.classList?.contains('layers-title')){
+        const t = document.createElement('div'); t.className='layers-title'; t.textContent='Base maps'; baseBox.parentNode.insertBefore(t, baseBox);
+      }
+      if (overBox && !overBox.previousSibling?.classList?.contains('layers-title')){
+        const t = document.createElement('div'); t.className='layers-title'; t.textContent='Data layers'; overBox.parentNode.insertBefore(t, overBox);
+      }
+    }
+    setTimeout(()=>{ layerControl.expand(); titleLayerSections(); }, 50);
 
     // scale + mouse position
     L.control.scale({metric:true, imperial:false}).addTo(map);
@@ -320,8 +353,8 @@
       }
     });
 
-    // simple distance measure
-    let measureMode=false, measureLine=null, measurePts=[];
+    // measure control
+    let measureMode=false, measureLine=null;
     const measCtl = L.control({position:'topleft'});
     measCtl.onAdd=()=>{ const d=L.DomUtil.create('div','ctrl'); d.innerHTML=`<div class="ctrl-row"><button id="m_toggle" class="ctrl-btn">Measure</button><button id="m_clear" class="ctrl-btn">×</button><span id="m_len" class="muted">0 km</span></div>`; return d; };
     measCtl.addTo(map);
@@ -333,22 +366,22 @@
     }
     map.on('click', e=>{
       if (!measureMode) return;
-      if (!measureLine){ measureLine = L.polyline([e.latlng],{color:'#111',weight:2,opacity:.85}).addTo(map); measurePts=[e.latlng]; }
-      else { measureLine.addLatLng(e.latlng); measurePts.push(e.latlng); }
+      if (!measureLine){ measureLine = L.polyline([e.latlng],{color:'#111',weight:2,opacity:.85}).addTo(map); }
+      else { measureLine.addLatLng(e.latlng); }
       measureUpdate();
     });
     document.addEventListener('click',(e)=>{
       if (e.target && e.target.id==='m_toggle'){ measureMode = !measureMode; e.target.textContent = measureMode ? 'Measuring…' : 'Measure'; }
-      if (e.target && e.target.id==='m_clear'){ if (measureLine){ map.removeLayer(measureLine); measureLine=null; measurePts=[]; } document.getElementById('m_len').textContent='0 km'; }
+      if (e.target && e.target.id==='m_clear'){ if (measureLine){ map.removeLayer(measureLine); measureLine=null; } document.getElementById('m_len').textContent='0 km'; }
     });
 
     // graticule overlay (5°)
     const graticule = L.layerGroup();
     for (let lat=-80; lat<=80; lat+=5){
-      const line = L.polyline([[lat,-180],[lat,180]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}); graticule.addLayer(line);
+      graticule.addLayer(L.polyline([[lat,-180],[lat,180]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}));
     }
     for (let lon=-180; lon<=180; lon+=5){
-      const line = L.polyline([[-85,lon],[85,lon]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}); graticule.addLayer(line);
+      graticule.addLayer(L.polyline([[-85,lon],[85,lon]], {color:'#999', weight:0.5, opacity:0.4, pane:'vectors'}));
     }
     layerControl.addOverlay(graticule, "Graticule");
 
@@ -361,13 +394,12 @@
 
     // registries
     let runCount = 0;
-    const runSuffix = ()=> `_${runCount}`;
     const rasterRegistry = {}; // key `${runId}:${kind}` => {layer, bounds, palette, name, runId, kind}
     let currentRunId = null;
 
-    // single points layer tied to latest run
+    // points/time
     let pointsLayer = null;
-    let pointsAllFeatures = []; // CSV features from latest run
+    let pointsAllFeatures = [];
     let dateKeyGlobal = null;
     let timeDates = [];
     let timeIndexOf = {};
@@ -376,7 +408,7 @@
     // point style state
     let ptStyle = { fillColor:"#7fa6ff", color:"#0b5fff", radius:4, fillOpacity:0.85, weight:1 };
 
-    // ---------- legends control (all rasters) ----------
+    // ---------- legends ----------
     const LegCtl = L.Control.extend({
       options: { position:'bottomright' },
       onAdd: function(){
@@ -392,7 +424,6 @@
       const ctx = canvas.getContext('2d');
       const w = canvas.width = 220, h = canvas.height = 12;
       const grd = ctx.createLinearGradient(0,0,w,0);
-      const add = (p,c)=>grd.addColorStop(p,`rgb(${c[0]},${c[1]},${c[2]})`);
       const P = {
         viridis:[[0,[68,1,84]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]],
         plasma:[[0,[13,8,135]],[.25,[126,3,168]],[.5,[203,71,119]],[.75,[248,149,64]],[1,[240,249,33]]],
@@ -405,7 +436,7 @@
         heat:[[0,[0,0,128]],[.25,[0,255,255]],[.5,[255,255,0]],[.75,[255,128,0]],[1,[128,0,0]]],
         gray:[[0,[0,0,0]],[1,[255,255,255]]]
       }[palette] || [[0,[0,0,0]],[1,[255,255,255]]];
-      P.forEach(([p,c])=>add(p,c));
+      for (const [p,[r,g,b]] of P) grd.addColorStop(p,`rgb(${r},${g},${b})`);
       ctx.fillStyle = grd; ctx.fillRect(0,0,w,h);
     }
 
@@ -429,19 +460,17 @@
         div.appendChild(head); div.appendChild(canvas); div.appendChild(meta);
         list.appendChild(div);
       });
+      titleLayerSections();
     }
 
-    // ---------- UI: field selects and preview ----------
+    // ---------- preview ----------
     function fillSelectOptions(sel, headers, preferred){
       sel.innerHTML = "";
       headers.forEach(h=>{ const opt=document.createElement("option"); opt.value=h; opt.textContent=h; sel.appendChild(opt); });
       const idx = headers.findIndex(h => h.toLowerCase() === preferred);
       if(idx>=0) sel.selectedIndex = idx;
     }
-    document.getElementById("toggle-preview").addEventListener("change",(e)=>{
-      document.getElementById("preview-wrap").style.display = e.target.checked ? "" : "none";
-      document.getElementById("preview-info").style.display = e.target.checked ? "" : "none";
-    });
+
     document.getElementById("preview").onclick = async () => {
       const f = document.getElementById("csvfile").files[0];
       if(!f){ alert("Select a CSV"); return; }
@@ -470,14 +499,18 @@
             tbody.appendChild(tr);
           });
           tbl.appendChild(thead); tbl.appendChild(tbody);
-          document.getElementById("preview-wrap").style.display = document.getElementById("toggle-preview").checked ? "" : "none";
+          document.getElementById("preview-wrap").style.display = "";
           const info = document.getElementById("preview-info");
-          info.style.display = document.getElementById("toggle-preview").checked ? "" : "none";
+          info.style.display = "";
           info.innerHTML = "";
           info.appendChild(chip(`Rows (preview): ${data.length}`));
           info.appendChild(chip(`Separator: ${sep === "\t" ? "tab" : sep}`));
         }
       });
+    };
+    document.getElementById("close-preview").onclick = () => {
+      document.getElementById("preview-wrap").style.display = "none";
+      document.getElementById("preview-info").style.display = "none";
     };
 
     // ---------- raster helpers ----------
@@ -513,14 +546,24 @@
       const sel = document.getElementById("raster_layer");
       if (sel.value === key){ document.getElementById("palette").value = palette; }
     }
-
     document.getElementById("raster_opacity").addEventListener("input", (e)=>{
       const sel = document.getElementById("raster_layer").value;
       const info = rasterRegistry[sel]; if (!info) return;
       info.layer.setOpacity(parseFloat(e.target.value));
     });
 
-    // ---------- points rendering / time ----------
+    // Save map PNG
+    document.getElementById('map-save').addEventListener('click', ()=>{
+      leafletImage(map, function(err, canvas){
+        if (err){ alert('Cannot render map (CORS on tiles)'); return; }
+        const a = document.createElement('a');
+        a.download = 'frontwave_map.png';
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      });
+    });
+
+    // ---------- points / time ----------
     function toISODate(s){
       if (s == null || s === "") return null;
       const m = String(s).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
@@ -556,10 +599,15 @@
     function renderPointsAt(idx){
       const slider = document.getElementById("time");
       if (typeof idx !== "number") idx = parseInt(slider.value);
-      const tcur = document.getElementById("time-current");
-      if (!timeDates.length){ tcur.textContent = "—"; if (pointsLayer) pointsLayer.clearLayers(); document.getElementById('outbreak-count').textContent = '0'; return; }
+      const tcurEl = document.getElementById("time-current");
+      if (!timeDates.length){
+        tcurEl.textContent = "—";
+        if (pointsLayer) pointsLayer.clearLayers();
+        document.getElementById('outbreak-count').textContent = '0';
+        return;
+      }
       const cutoff = timeDates[Math.max(0, Math.min(idx, timeDates.length-1))];
-      tcur.textContent = cutoff;
+      tcurEl.textContent = cutoff;
 
       const cum = document.getElementById("cumulate").checked;
       const feats = pointsAllFeatures.filter(f=>{
@@ -575,8 +623,8 @@
           pane:'vectors',
           pointToLayer: (f, latlng) => L.circleMarker(latlng, geojsonPointStyle())
         }).addTo(map);
-        overlays[`CSV points ${runSuffix()}`] = pointsLayer;
-        layerControl.addOverlay(pointsLayer, `CSV points ${runSuffix()}`);
+        const name = `CSV points _${runCount}`;
+        overlays[name] = pointsLayer; layerControl.addOverlay(pointsLayer, name);
       } else {
         pointsLayer.clearLayers();
         pointsLayer.addData({type:"FeatureCollection", features:feats});
@@ -601,37 +649,34 @@
 
     // ---------- velocity stats & histogram ----------
     let velChart = null;
-    let velStats = null; // raw stats from backend
-    let showCDF = false;
+    let velStats = null;
 
     function buildHistogram(stats, requestedBins){
-      // original bins count
       const edges = stats.hist_bins || [];
       const counts = stats.hist_counts || [];
       const M = Math.max(0, edges.length-1);
       if (M === 0) return {labels:[], counts:[], edges:[]};
 
-      // snap requested bins to a divisor of M
-      const divisors = [2,3,4,6,8,12,24,48].filter(d => M % d === 0 && d>=6 && d<=48);
+      // pick nearest allowed bin count
+      const allowed = [6,8,12,16,20,24,28,32,36,40,44,48].filter(d => M % d === 0);
       let target = requestedBins || M;
-      let snapped = divisors.reduce((a,b)=> Math.abs(b-target) < Math.abs(a-target) ? b : a, divisors[0]);
-      const g = M / snapped; // group size
+      let snapped = allowed.length ? allowed.reduce((a,b)=> Math.abs(b-target) < Math.abs(a-target) ? b : a, allowed[0]) : Math.min(Math.max(6, target), 48);
+      const g = Math.max(1, Math.round(M / snapped));
 
       const newCounts = [];
       const newEdges = [];
-      for(let i=0;i<snapped;i++){
-        const lo = i*g, hi = (i+1)*g;
+      for(let i=0;i<M;i+=g){
         let s=0;
-        for(let k=lo;k<hi;k++) s += counts[k];
+        for(let k=i;k<Math.min(i+g, M);k++) s += counts[k];
         newCounts.push(s);
-        newEdges.push(edges[lo]);
+        newEdges.push(edges[i]);
       }
-      newEdges.push(edges[M]); // last edge
+      newEdges.push(edges[M]);
       const labels = [];
-      for(let i=0;i<snapped;i++){
+      for(let i=0;i<newCounts.length;i++){
         labels.push(`${fmt(newEdges[i],2)}–${fmt(newEdges[i+1],2)}`);
       }
-      return {labels, counts:newCounts, edges:newEdges, snapped};
+      return {labels, counts:newCounts, edges:newEdges, snapped:newCounts.length};
     }
 
     function renderVelocitySummary(stats){
@@ -655,7 +700,7 @@
       if (!velStats){ return; }
       const requested = parseInt(document.getElementById('bins_slider').value);
       const {labels, counts, edges, snapped} = buildHistogram(velStats, requested);
-      document.getElementById('bins_slider').title = `Using ${snapped} bins (snapped to backend resolution)`;
+      document.getElementById('bins_label').textContent = String(snapped);
 
       const mean = velStats.mean, std = velStats.std, med = velStats.p50;
       const ctx = document.getElementById("velChart").getContext("2d");
@@ -706,7 +751,6 @@
       };
 
       if (document.getElementById('show_cdf').checked){
-        // CDF line overlay
         const total = counts.reduce((a,b)=>a+b,0)||1;
         let cum=0; const cdf=counts.map(v=>{ cum+=v; return cum/total; });
         cfg.data.datasets.push({ type:'line', label:'CDF', data:cdf, yAxisID:'y1', pointRadius:0, borderWidth:2 });
@@ -715,7 +759,14 @@
       velChart = new Chart(ctx, cfg);
     }
 
+    // bins controls
     document.getElementById('bins_slider').addEventListener('input', drawHistogram);
+    document.getElementById('bins_minus').addEventListener('click', ()=>{
+      const s = document.getElementById('bins_slider'); s.value = Math.max(parseInt(s.min), parseInt(s.value)-1); drawHistogram();
+    });
+    document.getElementById('bins_plus').addEventListener('click', ()=>{
+      const s = document.getElementById('bins_slider'); s.value = Math.min(parseInt(s.max), parseInt(s.value)+1); drawHistogram();
+    });
     document.getElementById('show_cdf').addEventListener('change', drawHistogram);
 
     // copy/save histogram image
@@ -812,7 +863,7 @@
       // velocity stats
       renderVelocitySummary(js?.stats?.velocity);
 
-      // rasters (names without "(deg)")
+      // rasters
       const names = {kriging:`Kriging surface ${suffix}`, slope:`Slope ${suffix}`, velocity:`Velocity ${suffix}`};
       if (js.images?.kriging)  addImage(js.run_id, "kriging",  js.images.kriging.url,  js.images.kriging.bounds,  names.kriging);
       if (js.images?.slope)    addImage(js.run_id, "slope",    js.images.slope.url,    js.images.slope.bounds,    names.slope);
@@ -832,7 +883,7 @@
         overlays[nm] = layer; layerControl.addOverlay(layer, nm);
       }
 
-      // points: ONLY the user CSV points for the latest run, tied to time slider
+      // points tied to time slider
       if (pointsLayer) { try{ layerControl.removeLayer(pointsLayer); map.removeLayer(pointsLayer); }catch{} pointsLayer = null; }
       pointsAllFeatures = [];
       if (js.urls.all_points_geojson){
@@ -848,12 +899,13 @@
         timeIndexOf = Object.fromEntries(uq.map((d,i)=>[d,i]));
         const slider = document.getElementById("time");
         const tstart = document.getElementById("time-start");
-        const tcur = document.getElementById("time-current");
+        const tend   = document.getElementById("time-end");
+        const tcur   = document.getElementById("time-current");
         if (!uq.length){
-          slider.disabled = true; slider.min=0; slider.max=0; slider.value=0; tstart.textContent="—"; tcur.textContent="—";
+          slider.disabled = true; slider.min=0; slider.max=0; slider.value=0; tstart.textContent="—"; tend.textContent="—"; tcur.textContent="—";
         } else {
           slider.min=0; slider.max=uq.length-1; slider.value=uq.length-1; slider.disabled=false;
-          tstart.textContent = uq[0]; tcur.textContent = uq[uq.length-1];
+          tstart.textContent = uq[0]; tend.textContent = uq[uq.length-1]; tcur.textContent = uq[uq.length-1];
         }
         pointsLayer = L.geoJSON({type:"FeatureCollection", features:[]}, {
           pane:'vectors',
@@ -865,6 +917,7 @@
       }
 
       layerControl.expand();
+      titleLayerSections();
 
       // log run
       const lg = document.getElementById("run-log");
