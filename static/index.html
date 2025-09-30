@@ -7,9 +7,9 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
-    :root { --primary:#0b5fff; --ink:#fff; --muted:#666; }
+    :root { --primary:#0b5fff; --ink:#fff; --muted:#666; --panel:#f7f9fc; --panel2:#eef3ff; }
     * { box-sizing:border-box }
-    body { margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111 }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#111 }
     header { background:#222; color:#fff; padding:1rem 1.25rem }
     header h1 { margin:0 0 .25rem; font-size:1.4rem }
     header h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
@@ -21,7 +21,6 @@
     .col { display:flex; flex-direction:column; gap:.5rem }
     label { font-size:.95rem }
     select, input[type="number"], input[type="text"], input[type="range"], input[type="color"] { padding:.35rem .45rem; border:1px solid #bbb; border-radius:8px; }
-    input[type="checkbox"] { transform:translateY(1px) }
     .muted { color:var(--muted) }
     .center { display:flex; justify-content:center; align-items:center; }
 
@@ -30,6 +29,7 @@
     .btn:disabled { opacity:.6; cursor:not-allowed }
 
     #map { height:560px; margin:1rem 0; border:1px solid #ddd; border-radius:10px }
+
     .table-wrap { overflow:auto; max-height:260px; border:1px solid #ddd; border-radius:8px; }
     table { border-collapse:collapse; width:100% }
     th, td { border:1px solid #eee; padding:4px 6px; font-size:12px; white-space:nowrap }
@@ -38,18 +38,18 @@
     .chips { display:flex; flex-wrap:wrap; gap:.5rem; }
     .chip { background:#f0f0f0; padding:.35rem .7rem; border-radius:999px; font-size:.9rem }
 
-    /* Legend panel */
+    /* Layer control sections */
+    .leaflet-control-layers { max-height:550px; overflow:auto }
+    .leaflet-control-layers-toggle { display:none }
+    .leaflet-control-layers-expanded { display:block; padding:.5rem .5rem .25rem .5rem; background:#fff; border:1px solid rgba(0,0,0,.25) }
+    .layers-title { font-weight:700; margin:.35rem 0 .25rem; }
+
+    /* Legend panel bottom-left */
     .leg-panel { background:#fff; border:1px solid #ccc; border-radius:8px; padding:.6rem; width:260px; max-height:320px; overflow:auto }
     .leg-item { margin:.45rem 0; }
     .leg-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; font-size:.9rem }
     .leg-grad { display:block; width:100%; height:12px; image-rendering:pixelated; border-radius:3px; border:1px solid #ddd; cursor:pointer; margin:.35rem 0 }
     .leg-meta { font-size:.8rem; color:#444; display:flex; justify-content:space-between }
-
-    /* Layer control expanded and titled */
-    .leaflet-control-layers { max-height:550px; overflow:auto }
-    .leaflet-control-layers-toggle { display:none }
-    .leaflet-control-layers-expanded { display:block; padding:.5rem .5rem .25rem .5rem; background:#fff; border:1px solid rgba(0,0,0,.25) }
-    .layers-title { font-weight:700; margin:.35rem 0 .25rem; }
 
     /* Histogram */
     #vel-chart-wrap { width:820px; max-width:100%; height:380px; background:#fff; border:1px solid #ddd; border-radius:10px; padding:.5rem; }
@@ -57,15 +57,19 @@
     .grow { flex:1 1 280px }
     .kpanel { border:1px dashed #ccc; padding:.75rem; border-radius:8px }
 
-    /* small map widgets */
-    .ctrl { background:#fff; border:1px solid rgba(0,0,0,.25); border-radius:6px; padding:.35rem .5rem; font-size:.85rem }
-    .ctrl h4 { margin:.25rem 0; font-size:.95rem }
-    .ctrl-btn { background:#fff; border:1px solid #bbb; border-radius:8px; padding:.25rem .5rem; cursor:pointer }
-    .ctrl-row { display:flex; gap:.35rem; align-items:center; flex-wrap:wrap }
-    .sep { height:1px; background:#eee; margin:.35rem 0 }
+    /* Toolbox (widget manager) */
+    #toolbox-toggle { position:fixed; right:10px; top:50%; transform:translateY(-50%); z-index:1000; padding:.5rem .75rem; border-radius:10px; border:1px solid #bbb; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.08) }
+    #toolbox { position:fixed; right:0; top:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid #cfd8ea; box-shadow: -6px 0 16px rgba(0,0,0,.08); z-index:999; transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column }
+    #toolbox.open { transform:translateX(0) }
+    .tb-head { display:flex; align-items:center; justify-content:space-between; padding:.75rem .9rem; border-bottom:1px solid #dfe6f5; background:#fff }
+    .tb-body { padding:.8rem .9rem; overflow:auto }
+    .tb-sec { background:#fff; border:1px solid #dfe6f5; border-radius:10px; padding:.7rem .75rem; margin-bottom:.75rem }
+    .tb-sec h4 { margin:.1rem 0 .5rem; font-size:1rem }
+    .tb-subtle { background:var(--panel2); border-color:#d0defe }
+    .tb-note { font-size:.85rem; color:#444; margin:.25rem 0 .5rem }
 
-    /* time header */
-    .timebar { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap }
+    /* Time emphasis */
+    .timebar { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap }
     .time-current { font-size:1.15rem; font-weight:800; background:#eef3ff; border:1px solid #cfe0ff; padding:.2rem .5rem; border-radius:8px; }
     .time-range { color:#333; font-weight:600 }
   </style>
@@ -168,7 +172,6 @@
       </div>
     </div>
 
-    <!-- Process button centered -->
     <div class="center">
       <button id="process" class="btn btn-primary">Process</button>
     </div>
@@ -176,45 +179,14 @@
 
   <!-- STEP 2 -->
   <section class="card">
-    <h2>Step 2 · Map & styling</h2>
-
-    <div class="row" style="align-items:flex-end">
-      <label>Raster layer
-        <select id="raster_layer"></select>
+    <h2>Step 2 · Map</h2>
+    <div class="row" style="align-items:center">
+      <label>Map height
+        <input type="range" id="map_h" min="360" max="1000" step="20" value="560">
       </label>
-      <label>Palette
-        <select id="palette">
-          <option>gray</option><option>viridis</option><option>plasma</option><option>magma</option>
-          <option>inferno</option><option>cividis</option><option>terrain</option><option>turbo</option>
-          <option>coolwarm</option><option>heat</option>
-        </select>
-      </label>
-      <label>Opacity
-        <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
-      </label>
-      <button id="apply-style" class="btn btn-primary">Render raster</button>
-      <button id="map-save" class="btn">Save map PNG</button>
+      <button id="map_max" class="btn">Maximize</button>
+      <span class="muted">Open the right “Tools” tab to style layers and control time.</span>
     </div>
-
-    <div class="row" style="align-items:flex-end; margin-top:.5rem">
-      <strong>Point styling</strong>
-      <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
-      <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
-      <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
-      <label>Opacity <input type="range" id="pt_opacity" value="0.85" min="0.1" max="1" step="0.05" style="width:120px"></label>
-      <button id="apply-pts-style" class="btn">Apply</button>
-    </div>
-
-    <div class="row timebar" style="align-items:center; margin-top:.25rem">
-      <div class="time-range">Range: <span id="time-start">—</span> → <span id="time-end">—</span></div>
-      <div class="time-current">Current: <span id="time-current">—</span></div>
-      <button id="play" class="btn">Play</button>
-      <button id="pause" class="btn">Pause</button>
-      <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
-      <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
-      <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
-    </div>
-
     <div id="map"></div>
   </section>
 
@@ -270,6 +242,79 @@
     <div id="run-log" class="row" style="gap:.75rem"></div>
   </section>
 
+  <!-- TOOLBOX: Widget manager -->
+  <button id="toolbox-toggle" aria-controls="toolbox" aria-expanded="false">Tools</button>
+  <aside id="toolbox" class="closed" aria-label="Widget manager">
+    <div class="tb-head">
+      <strong>Tools</strong>
+      <button id="toolbox-close" class="btn">Close</button>
+    </div>
+    <div class="tb-body">
+      <div class="tb-sec tb-subtle">
+        <h4>Layer symbology</h4>
+        <div class="tb-note">Raster and points are controlled independently.</div>
+        <div class="row" style="align-items:flex-end">
+          <label>Raster layer
+            <select id="raster_layer"></select>
+          </label>
+          <label>Palette
+            <select id="palette">
+              <option>gray</option><option>viridis</option><option>plasma</option><option>magma</option>
+              <option>inferno</option><option>cividis</option><option>terrain</option><option>turbo</option>
+              <option>coolwarm</option><option>heat</option>
+            </select>
+          </label>
+          <label>Opacity
+            <input type="range" id="raster_opacity" min="0.1" max="1" step="0.05" value="0.85">
+          </label>
+          <button id="apply-style" class="btn btn-primary">Render raster</button>
+        </div>
+      </div>
+
+      <div class="tb-sec">
+        <h4>Point symbology</h4>
+        <div class="row" style="align-items:flex-end">
+          <label>Fill <input type="color" id="pt_color" value="#7fa6ff"></label>
+          <label>Stroke <input type="color" id="pt_stroke" value="#0b5fff"></label>
+          <label>Size <input type="number" id="pt_size" value="4" min="1" max="20" style="width:4.5rem"></label>
+          <label>Opacity <input type="range" id="pt_opacity" value="0.85" min="0.1" max="1" step="0.05" style="width:120px"></label>
+          <button id="apply-pts-style" class="btn">Apply</button>
+        </div>
+      </div>
+
+      <div class="tb-sec tb-subtle">
+        <h4>Time control</h4>
+        <div class="timebar">
+          <div class="time-range">Range: <span id="time-start">—</span> → <span id="time-end">—</span></div>
+          <div class="time-current">Current: <span id="time-current">—</span></div>
+        </div>
+        <div class="row" style="align-items:center; margin-top:.4rem">
+          <button id="play" class="btn">Play</button>
+          <button id="pause" class="btn">Pause</button>
+          <div class="grow"><input type="range" id="time" min="0" max="0" value="0" step="1" style="width:100%"></div>
+          <label><input type="checkbox" id="cumulate" checked> Cumulative</label>
+          <div class="chip">Outbreaks: <span id="outbreak-count">0</span></div>
+        </div>
+      </div>
+
+      <div class="tb-sec">
+        <h4>Map tools</h4>
+        <div class="row" style="align-items:center">
+          <button id="fit_btn" class="btn">Fit all</button>
+          <label>Lat <input type="number" step="any" id="go_lat" placeholder="lat" style="width:6.2rem"></label>
+          <label>Lon <input type="number" step="any" id="go_lon" placeholder="lon" style="width:6.2rem"></label>
+          <button id="go_btn" class="btn">Go</button>
+        </div>
+        <div class="row" style="align-items:center; margin-top:.4rem">
+          <button id="m_toggle" class="btn">Measure</button>
+          <button id="m_clear" class="btn">×</button>
+          <span id="m_len" class="muted">0 km</span>
+          <button id="map-save" class="btn">Save map PNG</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <!-- libs -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
@@ -305,7 +350,6 @@
 
     const overlays = {};
     const layerControl = L.control.layers(base, overlays, {collapsed:false}).addTo(map);
-
     function titleLayerSections(){
       const c = layerControl.getContainer();
       if (!c) return;
@@ -320,60 +364,8 @@
     }
     setTimeout(()=>{ layerControl.expand(); titleLayerSections(); }, 50);
 
-    // scale + mouse position
+    // scale
     L.control.scale({metric:true, imperial:false}).addTo(map);
-    const mouseCtrl = L.control({position:'bottomleft'});
-    mouseCtrl.onAdd = () => { const d=L.DomUtil.create('div','ctrl'); d.id='mousepos'; d.textContent='Lat: —, Lng: —'; return d; };
-    mouseCtrl.addTo(map);
-    map.on('mousemove', (e)=>{ document.getElementById('mousepos').textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`; });
-
-    // fit-all control
-    const fitCtrl = L.control({position:'topleft'});
-    fitCtrl.onAdd = () => {
-      const d=L.DomUtil.create('div','ctrl');
-      const b=L.DomUtil.create('button','ctrl-btn',d); b.textContent='Fit all';
-      L.DomEvent.on(b,'click',(e)=>{ e.preventDefault(); const bnd = getAllBounds(); if (bnd) map.fitBounds(bnd.pad(0.05)); });
-      return d;
-    };
-    fitCtrl.addTo(map);
-
-    // go-to lat/lon control
-    const gotoCtl = L.control({position:'topleft'});
-    gotoCtl.onAdd = () => {
-      const d=L.DomUtil.create('div','ctrl');
-      d.innerHTML = `<div class="ctrl-row"><input type="number" step="any" id="go_lat" placeholder="lat" style="width:5.5rem"><input type="number" step="any" id="go_lon" placeholder="lon" style="width:5.5rem"><button id="go_btn" class="ctrl-btn">Go</button></div>`;
-      return d;
-    };
-    gotoCtl.addTo(map);
-    document.addEventListener('click', (e)=>{
-      if(e.target && e.target.id==='go_btn'){
-        const lat = parseFloat(document.getElementById('go_lat').value);
-        const lon = parseFloat(document.getElementById('go_lon').value);
-        if (isFinite(lat)&&isFinite(lon)) map.setView([lat,lon], 12);
-      }
-    });
-
-    // measure control
-    let measureMode=false, measureLine=null;
-    const measCtl = L.control({position:'topleft'});
-    measCtl.onAdd=()=>{ const d=L.DomUtil.create('div','ctrl'); d.innerHTML=`<div class="ctrl-row"><button id="m_toggle" class="ctrl-btn">Measure</button><button id="m_clear" class="ctrl-btn">×</button><span id="m_len" class="muted">0 km</span></div>`; return d; };
-    measCtl.addTo(map);
-    function measureUpdate(){
-      if (!measureLine) return;
-      const latlngs = measureLine.getLatLngs();
-      let m=0; for(let i=1;i<latlngs.length;i++){ m += map.distance(latlngs[i-1], latlngs[i]); }
-      document.getElementById('m_len').textContent = (m/1000).toFixed(3)+' km';
-    }
-    map.on('click', e=>{
-      if (!measureMode) return;
-      if (!measureLine){ measureLine = L.polyline([e.latlng],{color:'#111',weight:2,opacity:.85}).addTo(map); }
-      else { measureLine.addLatLng(e.latlng); }
-      measureUpdate();
-    });
-    document.addEventListener('click',(e)=>{
-      if (e.target && e.target.id==='m_toggle'){ measureMode = !measureMode; e.target.textContent = measureMode ? 'Measuring…' : 'Measure'; }
-      if (e.target && e.target.id==='m_clear'){ if (measureLine){ map.removeLayer(measureLine); measureLine=null; } document.getElementById('m_len').textContent='0 km'; }
-    });
 
     // graticule overlay (5°)
     const graticule = L.layerGroup();
@@ -408,9 +400,9 @@
     // point style state
     let ptStyle = { fillColor:"#7fa6ff", color:"#0b5fff", radius:4, fillOpacity:0.85, weight:1 };
 
-    // ---------- legends ----------
+    // ---------- legend (bottom-left) ----------
     const LegCtl = L.Control.extend({
-      options: { position:'bottomright' },
+      options: { position:'bottomleft' },
       onAdd: function(){
         const div = L.DomUtil.create('div','leg-panel');
         div.id = 'legend-panel';
@@ -439,12 +431,10 @@
       for (const [p,[r,g,b]] of P) grd.addColorStop(p,`rgb(${r},${g},${b})`);
       ctx.fillStyle = grd; ctx.fillRect(0,0,w,h);
     }
-
     function updateLegendsUI(){
       const list = document.getElementById('leg-list');
       list.innerHTML = '';
-      const entries = Object.entries(rasterRegistry);
-      entries.forEach(([key, info])=>{
+      Object.values(rasterRegistry).forEach(info=>{
         const div = document.createElement('div'); div.className='leg-item';
         const head = document.createElement('div'); head.className='leg-head';
         head.innerHTML = `<span>${info.name}</span><span class="muted" style="font-size:.8rem">${info.palette}</span>`;
@@ -470,7 +460,6 @@
       const idx = headers.findIndex(h => h.toLowerCase() === preferred);
       if(idx>=0) sel.selectedIndex = idx;
     }
-
     document.getElementById("preview").onclick = async () => {
       const f = document.getElementById("csvfile").files[0];
       if(!f){ alert("Select a CSV"); return; }
@@ -561,6 +550,19 @@
         a.href = canvas.toDataURL('image/png');
         a.click();
       });
+    });
+
+    // Map height / maximize
+    const mapEl = document.getElementById('map');
+    document.getElementById('map_h').addEventListener('input', (e)=>{
+      mapEl.style.height = `${e.target.value}px`; map.invalidateSize();
+    });
+    let maximized=false;
+    document.getElementById('map_max').addEventListener('click', ()=>{
+      maximized = !maximized;
+      mapEl.style.height = maximized ? '85vh' : `${document.getElementById('map_h').value}px`;
+      map.invalidateSize();
+      document.getElementById('map_max').textContent = maximized ? 'Restore' : 'Maximize';
     });
 
     // ---------- points / time ----------
@@ -657,25 +659,19 @@
       const M = Math.max(0, edges.length-1);
       if (M === 0) return {labels:[], counts:[], edges:[]};
 
-      // pick nearest allowed bin count
       const allowed = [6,8,12,16,20,24,28,32,36,40,44,48].filter(d => M % d === 0);
       let target = requestedBins || M;
       let snapped = allowed.length ? allowed.reduce((a,b)=> Math.abs(b-target) < Math.abs(a-target) ? b : a, allowed[0]) : Math.min(Math.max(6, target), 48);
       const g = Math.max(1, Math.round(M / snapped));
 
-      const newCounts = [];
-      const newEdges = [];
+      const newCounts = [], newEdges = [];
       for(let i=0;i<M;i+=g){
-        let s=0;
-        for(let k=i;k<Math.min(i+g, M);k++) s += counts[k];
-        newCounts.push(s);
-        newEdges.push(edges[i]);
+        let s=0; for(let k=i;k<Math.min(i+g, M);k++) s += counts[k];
+        newCounts.push(s); newEdges.push(edges[i]);
       }
       newEdges.push(edges[M]);
       const labels = [];
-      for(let i=0;i<newCounts.length;i++){
-        labels.push(`${fmt(newEdges[i],2)}–${fmt(newEdges[i+1],2)}`);
-      }
+      for(let i=0;i<newCounts.length;i++){ labels.push(`${fmt(newEdges[i],2)}–${fmt(newEdges[i+1],2)}`); }
       return {labels, counts:newCounts, edges:newEdges, snapped:newCounts.length};
     }
 
@@ -692,8 +688,7 @@
       document.getElementById("vel-std").textContent = fmt(stats.std);
       const ci = (stats.ci95_low!=null && stats.ci95_high!=null) ? `${fmt(stats.ci95_low)}–${fmt(stats.ci95_high)}` : "—";
       document.getElementById("vel-ci").textContent = ci;
-
-      drawHistogram(); // initial render
+      drawHistogram();
     }
 
     function drawHistogram(){
@@ -715,20 +710,19 @@
             legend:{ display:false },
             annotation:{
               annotations:{
-                stdBand:{
-                  type:'box',
+                stdBand:{ type:'box',
                   xMin:(()=>{ let x=mean-std; let i=edges.findIndex(v=>v>=x); return Math.max(0,i-1); })(),
                   xMax:(()=>{ let x=mean+std; let i=edges.findIndex(v=>v>=x); return Math.max(0,Math.min(labels.length-1,i-1)); })(),
                   backgroundColor:'rgba(0, 123, 255, 0.10)', borderWidth:0
                 },
-                meanLine:{
-                  type:'line', xMin:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
+                meanLine:{ type:'line',
+                  xMin:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
                   xMax:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
                   borderColor:'#0b5fff', borderWidth:2,
                   label:{ display:true, content:`mean ${fmt(mean,2)}`, position:'start', backgroundColor:'rgba(11,95,255,.15)' }
                 },
-                medLine:{
-                  type:'line', xMin:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
+                medLine:{ type:'line',
+                  xMin:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
                   xMax:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
                   borderColor:'#444', borderDash:[6,4], borderWidth:2,
                   label:{ display:true, content:`median ${fmt(med,2)}`, position:'end', backgroundColor:'rgba(0,0,0,.08)' }
@@ -769,32 +763,37 @@
     });
     document.getElementById('show_cdf').addEventListener('change', drawHistogram);
 
-    // copy/save histogram image
-    function saveCanvasPNG(canvas, filename){
-      const a = document.createElement('a');
-      a.download = filename;
-      a.href = canvas.toDataURL('image/png');
-      a.click();
+    // ---------- measure + goto + fit ----------
+    let measureMode=false, measureLine=null;
+    function measureUpdate(){
+      if (!measureLine) return;
+      const latlngs = measureLine.getLatLngs();
+      let m=0; for(let i=1;i<latlngs.length;i++){ m += map.distance(latlngs[i-1], latlngs[i]); }
+      document.getElementById('m_len').textContent = (m/1000).toFixed(3)+' km';
     }
-    async function copyCanvasToClipboard(canvas){
-      if (navigator.clipboard && window.ClipboardItem){
-        return new Promise(res=>canvas.toBlob(async b=>{
-          try{
-            await navigator.clipboard.write([new ClipboardItem({'image/png': b})]);
-            res(true);
-          }catch{ res(false); }
-        }, 'image/png'));
-      }
-      return false;
-    }
-    document.getElementById('hist-save').addEventListener('click', ()=>{
-      const c = document.getElementById('velChart');
-      saveCanvasPNG(c, 'velocity_histogram.png');
+    map.on('click', e=>{
+      if (!measureMode) return;
+      if (!measureLine){ measureLine = L.polyline([e.latlng],{color:'#111',weight:2,opacity:.85}).addTo(map); }
+      else { measureLine.addLatLng(e.latlng); }
+      measureUpdate();
     });
-    document.getElementById('hist-copy').addEventListener('click', async ()=>{
-      const c = document.getElementById('velChart');
-      const ok = await copyCanvasToClipboard(c);
-      if(!ok) alert('Copy not supported by this browser');
+    document.getElementById('m_toggle').addEventListener('click', ()=>{
+      measureMode = !measureMode;
+      document.getElementById('m_toggle').textContent = measureMode ? 'Measuring…' : 'Measure';
+    });
+    document.getElementById('m_clear').addEventListener('click', ()=>{
+      if (measureLine){ map.removeLayer(measureLine); measureLine=null; }
+      document.getElementById('m_len').textContent='0 km';
+    });
+    document.getElementById('fit_btn').addEventListener('click', ()=>{
+      const bnd = getAllBounds(); if (bnd) map.fitBounds(bnd.pad(0.05));
+    });
+    document.addEventListener('click', (e)=>{
+      if(e.target && e.target.id==='go_btn'){
+        const lat = parseFloat(document.getElementById('go_lat').value);
+        const lon = parseFloat(document.getElementById('go_lon').value);
+        if (isFinite(lat)&&isFinite(lon)) map.setView([lat,lon], 12);
+      }
     });
 
     // ---------- PROCESS ----------
@@ -854,7 +853,7 @@
           ul.appendChild(li);
         }
       }
-      // highlight single zip
+      // ZIP highlight
       const bz = js.urls.bundle_zip;
       const chipWrap = document.getElementById("bundle-chip");
       chipWrap.style.display = bz ? "" : "none";
@@ -869,7 +868,7 @@
       if (js.images?.slope)    addImage(js.run_id, "slope",    js.images.slope.url,    js.images.slope.bounds,    names.slope);
       if (js.images?.velocity) addImage(js.run_id, "velocity", js.images.velocity.url, js.images.velocity.bounds, names.velocity);
 
-      // vectors: ellipse, contours
+      // vectors
       if (js.urls.contours_geojson) {
         const gj = await fetchJSON(js.urls.contours_geojson);
         const layer = L.geoJSON(gj, {pane:'vectors', style:{color:"#0066cc", weight:1.5, opacity:0.9}}).addTo(map);
@@ -883,7 +882,7 @@
         overlays[nm] = layer; layerControl.addOverlay(layer, nm);
       }
 
-      // points tied to time slider
+      // points (time slider)
       if (pointsLayer) { try{ layerControl.removeLayer(pointsLayer); map.removeLayer(pointsLayer); }catch{} pointsLayer = null; }
       pointsAllFeatures = [];
       if (js.urls.all_points_geojson){
@@ -939,6 +938,17 @@
       if (!info) return;
       document.getElementById("palette").value = info.palette || 'gray';
     });
+
+    // ---------- toolbox open/close ----------
+    const tb = document.getElementById('toolbox');
+    const tbt = document.getElementById('toolbox-toggle');
+    const tbc = document.getElementById('toolbox-close');
+    function setTb(open){
+      tb.classList.toggle('open', open);
+      tbt.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    tbt.addEventListener('click', ()=> setTb(!tb.classList.contains('open')));
+    tbc.addEventListener('click', ()=> setTb(false));
   </script>
 </body>
 </html>
