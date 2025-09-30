@@ -142,7 +142,7 @@
         <label>Sill <input type="number" id="var_sill" placeholder="auto" step="any" style="width:7rem"></label>
         <label>Range <input type="number" id="var_range" placeholder="auto" step="any" style="width:7rem"></label>
         <label>Nugget <input type="number" id="var_nugget" placeholder="auto" step="any" style="width:7rem"></label>
-        <label># lags <input type="number" id="nlags" value="6" min="2" max="48" style="width:6rem"></label>
+        <label># lags <input type="number" id="nlags" value="6" min="2" max="80" style="width:6rem"></label>
         <label><input type="checkbox" id="use_weights"> Weighted</label>
       </div>
     </div>
@@ -202,7 +202,7 @@
       <div class="row" style="align-items:center">
         <strong>Bins:</strong>
         <button id="bins_minus" class="btn">−</button>
-        <input type="range" id="bins_slider" min="6" max="48" step="1" value="24" list="bins_ticks">
+        <input type="range" id="bins_slider" min="1" max="80" step="1" value="24" list="bins_ticks">
         <button id="bins_plus" class="btn">+</button>
         <span id="bins_label" class="chip">24</span>
         <label><input type="checkbox" id="show_cdf"> Show CDF</label>
@@ -210,11 +210,11 @@
         <button id="hist-save" class="btn">Save PNG</button>
       </div>
       <datalist id="bins_ticks">
-        <option value="6"></option>
-        <option value="12"></option>
+        <option value="1"></option>
+        <option value="10"></option>
         <option value="24"></option>
-        <option value="36"></option>
         <option value="48"></option>
+        <option value="80"></option>
       </datalist>
     </div>
     <div id="vel-chart-wrap"><canvas id="velChart"></canvas></div>
@@ -400,7 +400,7 @@
     });
     map.addControl(new LegCtl());
 
-    // Single toggle button to show/hide BOTH legend and layers control
+    // Single toggle button to show/hide BOTH legend and layer control
     const PanelsToggle = L.Control.extend({
       options:{ position:'topleft' },
       onAdd: function(){
@@ -658,26 +658,31 @@
     let velChart = null;
     let velStats = null;
 
-    function buildHistogram(stats, requestedBins){
-      const edges = stats.hist_bins || [];
-      const counts = stats.hist_counts || [];
+    // Rebin histogram to an arbitrary number of bins by proportional overlap
+    function rebinUniform(edges, counts, targetBins){
       const M = Math.max(0, edges.length-1);
-      if (M === 0) return {labels:[], counts:[], edges:[]};
-
-      const allowed = [6,8,12,16,20,24,28,32,36,40,44,48].filter(d => M % d === 0);
-      let target = requestedBins || M;
-      let snapped = allowed.length ? allowed.reduce((a,b)=> Math.abs(b-target) < Math.abs(a-target) ? b : a, allowed[0]) : Math.min(Math.max(6, target), 48);
-      const g = Math.max(1, Math.round(M / snapped));
-
-      const newCounts = [], newEdges = [];
-      for(let i=0;i<M;i+=g){
-        let s=0; for(let k=i;k<Math.min(i+g, M);k++) s += counts[k];
-        newCounts.push(s); newEdges.push(edges[i]);
+      if (M === 0 || targetBins < 1) return {edges:[], counts:[]};
+      const lo = edges[0], hi = edges[edges.length-1];
+      if (!(isFinite(lo) && isFinite(hi)) || hi <= lo) return {edges:[], counts:[]};
+      const width = (hi - lo) / targetBins;
+      const newEdges = Array.from({length: targetBins+1}, (_,i)=> lo + i*width);
+      const newCounts = new Array(targetBins).fill(0);
+      for (let i=0; i<M; i++){
+        const a = edges[i], b = edges[i+1], c = counts[i] || 0;
+        if (!(isFinite(a)&&isFinite(b)) || b<=a || c<=0) continue;
+        let j0 = Math.max(0, Math.floor((a - lo) / width));
+        let j1 = Math.min(targetBins-1, Math.floor((b - lo - 1e-12) / width));
+        for (let j=j0; j<=j1; j++){
+          const na = lo + j*width, nb = na + width;
+          const overlap = Math.max(0, Math.min(b, nb) - Math.max(a, na));
+          if (overlap > 0){
+            newCounts[j] += c * (overlap / (b - a));
+          }
+        }
       }
-      newEdges.push(edges[M]);
-      const labels = [];
-      for(let i=0;i<newCounts.length;i++){ labels.push(`${fmt(newEdges[i],2)}–${fmt(newEdges[i+1],2)}`); }
-      return {labels, counts:newCounts, edges:newEdges, snapped:newCounts.length};
+      // round to integers where sensible
+      for (let j=0;j<newCounts.length;j++) newCounts[j] = +newCounts[j].toFixed(6);
+      return {edges:newEdges, counts:newCounts};
     }
 
     function renderVelocitySummary(stats){
@@ -698,13 +703,28 @@
 
     function drawHistogram(){
       if (!velStats){ return; }
-      const requested = parseInt(document.getElementById('bins_slider').value);
-      const {labels, counts, edges, snapped} = buildHistogram(velStats, requested);
-      document.getElementById('bins_label').textContent = String(snapped);
+      const baseEdges  = velStats.hist_bins || [];
+      const baseCounts = velStats.hist_counts || [];
+      const bins = Math.max(1, parseInt(document.getElementById('bins_slider').value)||24);
+      const {edges, counts} = rebinUniform(baseEdges, baseCounts, bins);
+      document.getElementById('bins_label').textContent = String(bins);
+
+      // Build labels from edges
+      const labels = [];
+      for (let i=0;i<bins;i++){ labels.push(`${fmt(edges[i],2)}–${fmt(edges[i+1],2)}`); }
 
       const mean = velStats.mean, std = velStats.std, med = velStats.p50;
       const ctx = document.getElementById("velChart").getContext("2d");
       if (velChart) velChart.destroy();
+
+      // Map a value to nearest bin index (for annotations)
+      function idxForValue(x){
+        if (!(isFinite(x))) return 0;
+        if (x <= edges[0]) return 0;
+        if (x >= edges[edges.length-1]) return bins-1;
+        for (let i=1;i<edges.length;i++){ if (edges[i] >= x) return Math.max(0, i-1); }
+        return bins-1;
+      }
 
       const cfg = {
         type: 'bar',
@@ -716,19 +736,19 @@
             annotation:{
               annotations:{
                 stdBand:{ type:'box',
-                  xMin:(()=>{ let x=mean-std; let i=edges.findIndex(v=>v>=x); return Math.max(0,i-1); })(),
-                  xMax:(()=>{ let x=mean+std; let i=edges.findIndex(v=>v>=x); return Math.max(0,Math.min(labels.length-1,i-1)); })(),
+                  xMin: idxForValue(mean - std),
+                  xMax: idxForValue(mean + std),
                   backgroundColor:'rgba(0, 123, 255, 0.10)', borderWidth:0
                 },
                 meanLine:{ type:'line',
-                  xMin:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
-                  xMax:(()=>{ let i=edges.findIndex(v=>v>=mean); return Math.max(0,i-1); })(),
+                  xMin: idxForValue(mean),
+                  xMax: idxForValue(mean),
                   borderColor:'#0b5fff', borderWidth:2,
                   label:{ display:true, content:`mean ${fmt(mean,2)}`, position:'start', backgroundColor:'rgba(11,95,255,.15)' }
                 },
                 medLine:{ type:'line',
-                  xMin:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
-                  xMax:(()=>{ let i=edges.findIndex(v=>v>=med); return Math.max(0,i-1); })(),
+                  xMin: idxForValue(med),
+                  xMax: idxForValue(med),
                   borderColor:'#444', borderDash:[6,4], borderWidth:2,
                   label:{ display:true, content:`median ${fmt(med,2)}`, position:'end', backgroundColor:'rgba(0,0,0,.08)' }
                 }
@@ -758,6 +778,7 @@
       velChart = new Chart(ctx, cfg);
     }
 
+    // Histogram UI events
     document.getElementById('bins_slider').addEventListener('input', drawHistogram);
     document.getElementById('bins_minus').addEventListener('click', ()=>{
       const s = document.getElementById('bins_slider'); s.value = Math.max(parseInt(s.min), parseInt(s.value)-1); drawHistogram();
@@ -766,6 +787,24 @@
       const s = document.getElementById('bins_slider'); s.value = Math.min(parseInt(s.max), parseInt(s.value)+1); drawHistogram();
     });
     document.getElementById('show_cdf').addEventListener('change', drawHistogram);
+
+    // Copy/save histogram image
+    document.getElementById('hist-save').addEventListener('click', ()=>{
+      const c = document.getElementById('velChart');
+      const a = document.createElement('a');
+      a.download = 'velocity_histogram.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+    });
+    document.getElementById('hist-copy').addEventListener('click', async ()=>{
+      const c = document.getElementById('velChart');
+      if (!navigator.clipboard || !window.ClipboardItem){ alert('Clipboard not supported'); return; }
+      c.toBlob(async blob=>{
+        try {
+          await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+        } catch(e){ alert('Copy failed'); }
+      });
+    });
 
     let measureMode=false, measureLine=null;
     function measureUpdate(){
