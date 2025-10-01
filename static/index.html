@@ -1,19 +1,23 @@
-<!-- static/index.html (full file) -->
+<!-- static/index.html (full file with logo support) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>FrontWave - Viewer</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="/static/img/logo.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     :root { --primary:#0b5fff; --ink:#fff; --muted:#666; --panel:#f7f9fc; --panel2:#eef3ff; }
     * { box-sizing:border-box }
     body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#111 }
-    header { background:#222; color:#fff; padding:1rem 1.25rem }
-    header h1 { margin:0 0 .25rem; font-size:1.4rem }
-    header h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
-    header p { margin:0; color:#b7b7b7; font-size:.9rem }
+
+    /* Header with logo */
+    header.brand{background:#222;color:#fff;padding:1rem 1.25rem;display:flex;align-items:center;gap:.75rem}
+    header .titles h1 { margin:0 0 .25rem; font-size:1.4rem }
+    header .titles h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
+    header .titles p { margin:0; color:#b7b7b7; font-size:.9rem }
+    .logo{height:40px;width:auto}
+    .logo-sm{height:20px;width:auto}
 
     section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff; position:relative }
     h2 { margin:.25rem 0 .75rem; font-size:1.2rem }
@@ -59,6 +63,7 @@
     #toolbox { position:absolute; right:0; top:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid #cfd8ea; box-shadow: -6px 0 16px rgba(0,0,0,.08); z-index:900; transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column; border-top-right-radius:10px; border-bottom-right-radius:10px }
     #toolbox.open { transform:translateX(0) }
     .tb-head { display:flex; align-items:center; justify-content:space-between; padding:.6rem .8rem; border-bottom:1px solid #dfe6f5; background:#fff }
+    .tb-head .brand { display:flex; align-items:center; gap:.5rem }
     .tb-body { padding:.8rem .9rem; overflow:auto }
     .tb-sec { background:#fff; border:1px solid #dfe6f5; border-radius:10px; padding:.7rem .75rem; margin-bottom:.75rem }
     .tb-sec h4 { margin:.1rem 0 .5rem; font-size:1rem }
@@ -71,10 +76,13 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>FrontWave Tool</h1>
-    <h3>Interpolation and velocity with quick stats</h3>
-    <p>1) Load CSV → 2) Set fields and kriging params → 3) Process → 4) Map, legends, and downloads</p>
+  <header class="brand">
+    <img src="/static/img/logo.png" alt="FrontWave logo" class="logo">
+    <div class="titles">
+      <h1>FrontWave Tool</h1>
+      <h3>Interpolation and velocity with quick stats</h3>
+      <p>1) Load CSV → 2) Set fields and kriging params → 3) Process → 4) Map, legends, and downloads</p>
+    </div>
   </header>
 
   <!-- Step 1 -->
@@ -173,7 +181,6 @@
   <section class="card" id="map-card">
     <h2>Step 2 · Map</h2>
 
-    <!-- Controls row with Tools button INSIDE step 2 -->
     <div class="row" style="align-items:center">
       <label>Map height
         <input type="range" id="map_h" min="360" max="1000" step="20" value="560">
@@ -183,7 +190,6 @@
       <span class="muted">Use tools to style layers and export map.</span>
     </div>
 
-    <!-- Visibility checkboxes INSIDE step 2, OUTSIDE map -->
     <div class="row" style="align-items:center; margin:.25rem 0">
       <label><input type="checkbox" id="show_layerctl" checked> Show layer control</label>
       <label><input type="checkbox" id="show_legend" checked> Show legend</label>
@@ -208,10 +214,13 @@
     <div class="map-wrap">
       <div id="map"></div>
 
-      <!-- Toolbox PANEL embedded in Step 2, slides over map to the right -->
+      <!-- Toolbox PANEL embedded in Step 2 -->
       <aside id="toolbox" aria-label="Widget manager">
         <div class="tb-head">
-          <strong>Tools</strong>
+          <div class="brand">
+            <img src="/static/img/logo.png" alt="Logo" class="logo-sm">
+            <strong>Tools</strong>
+          </div>
           <button id="toolbox-close" class="btn">Close</button>
         </div>
         <div class="tb-body">
@@ -409,7 +418,7 @@
     });
     map.addControl(new LegCtl());
 
-    // Map toggle button (kept)
+    // Toggle for legend + layer list
     const PanelsToggle = L.Control.extend({
       options:{ position:'topleft' },
       onAdd: function(){
