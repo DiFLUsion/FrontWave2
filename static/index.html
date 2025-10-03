@@ -1,4 +1,4 @@
-<!-- static/index.html (full file with logo support) -->
+<!-- static/index.html (updated header with larger logo, concise description, and credits) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,13 +11,14 @@
     * { box-sizing:border-box }
     body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#111 }
 
-    /* Header with logo */
-    header.brand{background:#222;color:#fff;padding:1rem 1.25rem;display:flex;align-items:center;gap:.75rem}
-    header .titles h1 { margin:0 0 .25rem; font-size:1.4rem }
-    header .titles h3 { margin:.1rem 0 .25rem; font-weight:500; color:#cfcfcf }
-    header .titles p { margin:0; color:#b7b7b7; font-size:.9rem }
-    .logo{height:40px;width:auto}
-    .logo-sm{height:20px;width:auto}
+    /* Header banner with large logo */
+    header.brand{background:#111;color:#fff;padding:0}
+    .brand-inner{max-width:1280px;margin:0 auto;padding:.25rem 1rem 1rem}
+    .logo-banner{display:block;width:100%;max-height:220px;height:auto;object-fit:contain;margin:.25rem auto .5rem}
+    .brand-title{margin:.25rem 0 .25rem;font-size:1.35rem;font-weight:700;letter-spacing:.2px}
+    .brand-desc{margin:.15rem 0 .3rem;color:#ddd;font-size:1rem}
+    .brand-credits{margin:.1rem 0 0;color:#bdbdbd;font-size:.95rem}
+    .brand-credits strong{color:#fff;font-weight:600}
 
     section.card { margin:1rem; padding:1rem; border:1px solid #ddd; border-radius:10px; background:#fff; position:relative }
     h2 { margin:.25rem 0 .75rem; font-size:1.2rem }
@@ -76,12 +77,19 @@
   </style>
 </head>
 <body>
-  <header class="brand">
-    <img src="/static/img/logo.png" alt="FrontWave logo" class="logo">
-    <div class="titles">
-      <h1>FrontWave Tool</h1>
-      <h3>Interpolation and velocity with quick stats</h3>
-      <p>1) Load CSV → 2) Set fields and kriging params → 3) Process → 4) Map, legends, and downloads</p>
+  <!-- Header with large logo, concise description, and credits -->
+  <header class="brand" aria-labelledby="app-title">
+    <div class="brand-inner">
+      <!-- Replace the image file with your own logo at /static/img/logo.png -->
+      <img src="/static/img/logo.png" alt="FrontWave logo" class="logo-banner">
+
+      <h1 id="app-title" class="brand-title">FrontWave Tool</h1>
+      <p class="brand-desc">
+        Web viewer for spatial interpolation and outbreak-velocity analysis. Load your CSV, set fields and kriging parameters, process, and explore results on the map with time control and rich styling.
+      </p>
+      <p class="brand-credits">
+        Credits: <strong id="credit-group">[Your group]</strong> · <strong id="credit-project">[Your project]</strong>
+      </p>
     </div>
   </header>
 
@@ -218,7 +226,7 @@
       <aside id="toolbox" aria-label="Widget manager">
         <div class="tb-head">
           <div class="brand">
-            <img src="/static/img/logo.png" alt="Logo" class="logo-sm">
+            <img src="/static/img/logo.png" alt="Logo" style="height:20px;width:auto">
             <strong>Tools</strong>
           </div>
           <button id="toolbox-close" class="btn">Close</button>
@@ -470,8 +478,9 @@
         const canvas = document.createElement('canvas'); canvas.className='leg-grad';
         drawGrad(canvas, info.palette);
         canvas.addEventListener('click', async ()=>{
-          const idx = (PALETTES.indexOf(info.palette)+1) % PALETTES.length;
-          await renderRasterWithPalette(info.runId, info.kind, PALETTES[idx], info);
+          const idx = (['gray','viridis','plasma','magma','inferno','cividis','terrain','turbo','coolwarm','heat'].indexOf(info.palette)+1) % 10;
+          const pal = ['gray','viridis','plasma','magma','inferno','cividis','terrain','turbo','coolwarm','heat'][idx];
+          await renderRasterWithPalette(info.runId, info.kind, pal, info);
           updateLegendsUI();
         });
         const meta = document.createElement('div'); meta.className='leg-meta';
